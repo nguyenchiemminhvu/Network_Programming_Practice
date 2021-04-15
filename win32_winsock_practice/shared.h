@@ -501,8 +501,6 @@ namespace ClientServerApplication_Async
                     return;
                 }
 
-
-
                 auto f_client =
                     [=](SOCKET client)
                 {
