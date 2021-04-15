@@ -1,0 +1,6 @@
+*.exe
+Debug
+debug
+release
+.vs
+build-qt*
