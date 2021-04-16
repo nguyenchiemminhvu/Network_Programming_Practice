@@ -399,6 +399,15 @@ namespace ClientServerApplication_Async
             return;
         }
 
+        unsigned long io_non_block_mode = 1;
+        rc = ioctlsocket(soc_listen, FIONBIO, (unsigned long*)&io_non_block_mode);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
         rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
         if (rc)
         {
@@ -415,7 +424,7 @@ namespace ClientServerApplication_Async
             return;
         }
 
-
+        
     }
 
     void UDP_Server()
