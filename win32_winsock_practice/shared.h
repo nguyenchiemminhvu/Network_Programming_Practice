@@ -424,7 +424,34 @@ namespace ClientServerApplication_Async
             return;
         }
 
-        
+        fd_set fds_read;
+        timeval timeout;
+        timeout.tv_sec = 1;
+        timeout.tv_usec = 0;
+
+        while (true)
+        {
+            FD_ZERO(&fds_read);
+            FD_SET(soc_listen, &fds_read);
+
+            rc = select(0, &fds_read, NULL, NULL, &timeout);
+            if (rc == SOCKET_ERROR)
+            {
+                WS_ERROR("select failed with code:", WSAGetLastError());
+            }
+            else if (rc == 0)
+            {
+                //WS_LOG("Timeout while waiting for client connection");
+            }
+            else if (rc > 0)
+            {
+                // check to see if the socket is still part of read set
+                if (FD_ISSET(soc_listen, &fds_read))
+                {
+                    WS_LOG("A read event has occurred on client connected socket");
+                }
+            }
+        }
     }
 
     void UDP_Server()
@@ -503,6 +530,8 @@ namespace ClientServerApplication_Async
                 server_info.sin_port = htons(PORTS::ASYNC_TCP_SERVER);
                 server_info.sin_addr.s_addr = inet_addr(server_ip.data());
 
+                int server_info_len = sizeof(server_info);
+
                 SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
                 if (soc_client == INVALID_SOCKET)
                 {
@@ -510,28 +539,22 @@ namespace ClientServerApplication_Async
                     return;
                 }
 
-                auto f_client =
-                    [=](SOCKET client)
-                {
-                    std::string request;
-                    while (f_prompt("Enter message: ") && std::getline(std::cin, request))
-                    {
-                        
-                    }
-                };
-                std::thread t_client(f_client, soc_client);
-                if (t_client.joinable())
-                {
-                    t_client.join();
-                }
-
-                rc = shutdown(soc_client, SD_BOTH);
+                unsigned long io_non_block_mode = 1;
+                rc = ioctlsocket(soc_client, FIONBIO, &io_non_block_mode);
                 if (rc == SOCKET_ERROR)
                 {
-                    WS_ERROR("shutdown failed with error code:", WSAGetLastError(), CLIENT);
+                    WS_ERROR("set non-block socket mode failed with code:", WSAGetLastError(), CLIENT);
                     closesocket(soc_client);
                     return;
                 }
+
+                rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
+                }
+
+
 
                 closesocket(soc_client);
             }
