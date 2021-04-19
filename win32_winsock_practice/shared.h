@@ -418,7 +418,7 @@ namespace ClientServerApplication_Async
         }
 
         unsigned long io_non_block_mode = 1;
-        rc = ioctlsocket(soc_listen, FIONBIO, (unsigned long*)&io_non_block_mode);
+        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
         if (rc == SOCKET_ERROR)
         {
             WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
@@ -461,6 +461,9 @@ namespace ClientServerApplication_Async
             for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
             {
                 SOCKET_INFO* socket_info = sockets[i];
+                if (!socket_info)
+                    continue;
+
                 if (socket_info->byte_recv == 0)
                 {
                     FD_SET(socket_info->socket, &fds_read);
@@ -508,6 +511,9 @@ namespace ClientServerApplication_Async
             for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
             {
                 SOCKET_INFO* socket_info = sockets[i];
+                if (!socket_info)
+                    continue;
+
                 if (FD_ISSET(socket_info->socket, &fds_read))
                 {
                     rc = recv(socket_info->socket, socket_info->buffer, 1024, 0);
@@ -554,15 +560,15 @@ namespace ClientServerApplication_Async
                 }
             }
 
-            for (std::vector<SOCKET_INFO*>::iterator it = sockets.begin(); !sockets.empty() && it != sockets.end(); )
+            for (int i = 0; i < FD_SETSIZE && i < sockets.size(); )
             {
-                if (*it == NULL)
+                if (!sockets[i])
                 {
-                    sockets.erase(it);
+                    sockets.erase(sockets.begin() + i);
                 }
                 else
                 {
-                    it++;
+                    i++;
                 }
             }
         }
