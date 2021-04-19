@@ -380,6 +380,22 @@ namespace ClientServerApplication_Async
 {
     auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
 
+    class SOCKET_INFO
+    {
+    public:
+        SOCKET socket;
+        char buffer[1024];
+        DWORD byte_send;
+        DWORD byte_recv;
+
+        SOCKET_INFO(SOCKET s)
+        {
+            socket = s;
+            byte_recv = byte_send = 0;
+            memset(buffer, 0, 1024);
+        }
+    };
+
     void TCP_Server()
     {
         int rc;
@@ -424,7 +440,11 @@ namespace ClientServerApplication_Async
             return;
         }
 
+        std::vector<SOCKET_INFO*> sockets(FD_SETSIZE);
+
         fd_set fds_read;
+        fd_set fds_write;
+
         timeval timeout;
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
@@ -432,12 +452,15 @@ namespace ClientServerApplication_Async
         while (true)
         {
             FD_ZERO(&fds_read);
+            FD_ZERO(&fds_write);
+
             FD_SET(soc_listen, &fds_read);
 
             rc = select(0, &fds_read, NULL, NULL, &timeout);
             if (rc == SOCKET_ERROR)
             {
                 WS_ERROR("select failed with code:", WSAGetLastError());
+                break;
             }
             else if (rc == 0)
             {
@@ -449,6 +472,26 @@ namespace ClientServerApplication_Async
                 if (FD_ISSET(soc_listen, &fds_read))
                 {
                     WS_LOG("A read event has occurred on client connected socket");
+                    SOCKET soc_client = accept(soc_listen, NULL, NULL);
+                    if (soc_client == INVALID_SOCKET)
+                    {
+                        WS_ERROR("accept failed with code:", WSAGetLastError());
+                        break;
+                    }
+
+                    rc = ioctlsocket(soc_client, FIONBIO, &io_non_block_mode);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_ERROR("set socket non block mode failed with code:", WSAGetLastError());
+                        break;
+                    }
+
+                    sockets.push_back(new SOCKET_INFO(soc_client));
+                }
+
+                for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
+                {
+
                 }
             }
         }
