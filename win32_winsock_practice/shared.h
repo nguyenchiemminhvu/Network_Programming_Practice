@@ -389,7 +389,7 @@ namespace ClientServerApplication_Async
 
         sockaddr_in soc_listen_info = { 0 };
         soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::SYNC_TCP_SERVER);
+        soc_listen_info.sin_port = htons(PORTS::ASYNC_TCP_SERVER);
         soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
 
         SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -539,22 +539,40 @@ namespace ClientServerApplication_Async
                     return;
                 }
 
-                unsigned long io_non_block_mode = 1;
-                rc = ioctlsocket(soc_client, FIONBIO, &io_non_block_mode);
-                if (rc == SOCKET_ERROR)
-                {
-                    WS_ERROR("set non-block socket mode failed with code:", WSAGetLastError(), CLIENT);
-                    closesocket(soc_client);
-                    return;
-                }
-
                 rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
                 if (rc == SOCKET_ERROR)
                 {
                     WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
+                    closesocket(soc_client);
+                    return;
                 }
 
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
 
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    buffer[rc] = '\0';
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+                }
 
                 closesocket(soc_client);
             }
