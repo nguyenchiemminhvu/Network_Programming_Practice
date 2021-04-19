@@ -387,14 +387,19 @@ namespace ClientServerApplication_Async
     public:
         SOCKET socket;
         char buffer[1024];
-        DWORD byte_send;
         DWORD byte_recv;
 
         SOCKET_INFO(SOCKET s)
         {
             socket = s;
-            byte_recv = byte_send = 0;
+            byte_recv = 0;
             memset(buffer, 0, 1024);
+        }
+
+        void ResetData()
+        {
+            memset(buffer, 0, 1024);
+            byte_recv = 0;
         }
     };
 
@@ -468,7 +473,7 @@ namespace ClientServerApplication_Async
                 {
                     FD_SET(socket_info->socket, &fds_read);
                 }
-                else if (socket_info->byte_recv && socket_info->byte_send == 0)
+                else
                 {
                     FD_SET(socket_info->socket, &fds_write);
                 }
@@ -551,11 +556,7 @@ namespace ClientServerApplication_Async
                     }
                     else
                     {
-                        socket_info->byte_send += rc;
-                        if (socket_info->byte_send == socket_info->byte_recv)
-                        {
-                            socket_info->byte_recv = socket_info->byte_send = 0;
-                        }
+                        socket_info->ResetData();
                     }
                 }
             }
