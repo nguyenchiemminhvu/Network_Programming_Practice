@@ -28,6 +28,8 @@
 
 #pragma comment (lib, "ws2_32.lib")
 
+#define SAFE_DELETE(p) do { if (p) delete p; p = NULL; } while(p)
+
 enum ApplicationType
 {
     SERVER,
@@ -440,7 +442,7 @@ namespace ClientServerApplication_Async
             return;
         }
 
-        std::vector<SOCKET_INFO*> sockets(FD_SETSIZE);
+        std::vector<SOCKET_INFO*> sockets;
 
         fd_set fds_read;
         fd_set fds_write;
@@ -455,6 +457,19 @@ namespace ClientServerApplication_Async
             FD_ZERO(&fds_write);
 
             FD_SET(soc_listen, &fds_read);
+
+            for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
+            {
+                SOCKET_INFO* socket_info = sockets[i];
+                if (socket_info->byte_recv == 0)
+                {
+                    FD_SET(socket_info->socket, &fds_read);
+                }
+                else if (socket_info->byte_recv && socket_info->byte_send == 0)
+                {
+                    FD_SET(socket_info->socket, &fds_write);
+                }
+            }
 
             rc = select(0, &fds_read, NULL, NULL, &timeout);
             if (rc == SOCKET_ERROR)
@@ -488,10 +503,66 @@ namespace ClientServerApplication_Async
 
                     sockets.push_back(new SOCKET_INFO(soc_client));
                 }
+            }
 
-                for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
+            for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
+            {
+                SOCKET_INFO* socket_info = sockets[i];
+                if (FD_ISSET(socket_info->socket, &fds_read))
                 {
+                    rc = recv(socket_info->socket, socket_info->buffer, 1024, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        if (WSAGetLastError() == WSAEWOULDBLOCK)
+                        {
+                            WS_ERROR("recv failed with code:", WSAGetLastError());
+                            SAFE_DELETE(sockets[i]);
+                        }
+                        continue;
+                    }
+                    else
+                    {
+                        socket_info->byte_recv = rc;
+                        if (rc == 0)
+                        {
+                            SAFE_DELETE(sockets[i]);
+                            continue;
+                        }
+                    }
+                }
+                
+                if (FD_ISSET(socket_info->socket, &fds_write))
+                {
+                    rc = send(socket_info->socket, socket_info->buffer, 1024, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        if (WSAGetLastError() == WSAEWOULDBLOCK)
+                        {
+                            WS_ERROR("send failed with code:", WSAGetLastError());
+                            SAFE_DELETE(sockets[i]);
+                        }
+                        continue;
+                    }
+                    else
+                    {
+                        socket_info->byte_send += rc;
+                        if (socket_info->byte_send == socket_info->byte_recv)
+                        {
+                            socket_info->byte_recv = socket_info->byte_send = 0;
+                        }
+                    }
+                }
+            }
 
+            for (std::vector<SOCKET_INFO*>::iterator it = sockets.begin(); !sockets.empty() && it != sockets.end(); )
+            {
+                if (*it == NULL)
+                {
+                    sockets.erase(it);
+                }
+                else
+                {
+                    it++;
                 }
             }
         }
@@ -611,7 +682,6 @@ namespace ClientServerApplication_Async
                         break;
                     }
 
-                    buffer[rc] = '\0';
                     f_prompt("Received data from server: ");
                     f_prompt(buffer);
                     f_prompt("\n");
