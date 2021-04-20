@@ -753,6 +753,10 @@ namespace ClientServer_SelectModel
 
 namespace ClientServer_AsyncSelectModel
 {
+#ifndef WM_SOCKET
+#define WM_SOCKET (WM_USER + 1)
+#endif
+
     auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
 
     class SOCKET_INFO
@@ -825,6 +829,12 @@ namespace ClientServer_AsyncSelectModel
 
     void TCP_Server()
     {
+        HWND soc_window = CreateServerWindow();
+        if (!soc_window)
+        {
+            return;
+        }
+
         int rc;
 
         hostent* he = gethostbyname("");
@@ -842,20 +852,18 @@ namespace ClientServer_AsyncSelectModel
             return;
         }
 
-        unsigned long io_non_block_mode = 1;
-        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
-        if (rc == SOCKET_ERROR)
-        {
-            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
-            closesocket(soc_listen);
-            return;
-        }
-
         rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
         if (rc)
         {
             WS_ERROR("bind failed with error code:", WSAGetLastError());
             closesocket(soc_listen);
+            return;
+        }
+
+        rc = WSAAsyncSelect(soc_listen, soc_window, WM_SOCKET, FD_ACCEPT | FD_CLOSE);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("Async select failed with code:", WSAGetLastError());
             return;
         }
 
@@ -867,7 +875,10 @@ namespace ClientServer_AsyncSelectModel
             return;
         }
 
-        
+        while (true)
+        {
+
+        }
     }
 
     void UDP_Server()
