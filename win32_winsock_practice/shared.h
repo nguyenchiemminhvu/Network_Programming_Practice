@@ -780,8 +780,65 @@ namespace ClientServer_AsyncSelectModel
         }
     };
 
+    std::vector<SOCKET_INFO*> connected_sockets;
+
+    LRESULT CALLBACK TCP_Socket_Event_Handler(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+    {
+        if (WSAGETSELECTERROR(lParam))
+        {
+            WS_ERROR("Error in socket event handler:", WSAGetLastError());
+            closesocket((SOCKET)wParam);
+            return -1;
+        }
+
+        SOCKET connected = INVALID_SOCKET;
+
+        switch (WSAGETSELECTEVENT(lParam))
+        {
+        case FD_ACCEPT:
+            connected = accept((SOCKET)wParam, NULL, NULL);
+            if (connected == INVALID_SOCKET)
+            {
+                WS_ERROR("accept failed with code:", WSAGetLastError());
+                return -1;
+            }
+            WSAAsyncSelect(connected, hwnd, WM_SOCKET, FD_READ | FD_WRITE | FD_CLOSE);
+            connected_sockets.push_back(new SOCKET_INFO(connected));
+            break;
+
+        case FD_READ:
+            
+            break;
+
+        case FD_WRITE:
+            
+            break;
+
+        case FD_CLOSE:
+            WS_LOG("close socket", wParam);
+            for (int i = 0; i < connected_sockets.size(); i++)
+            {
+                if (connected_sockets[i]->socket == wParam)
+                {
+                    closesocket(connected_sockets[i]->socket);
+                    SAFE_DELETE(connected_sockets[i]);
+                }
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+
     LRESULT CALLBACK TCP_Server_Proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
+        switch (uMsg)
+        {
+        case WM_SOCKET: 
+            return TCP_Socket_Event_Handler(hwnd, uMsg, wParam, lParam);
+        }
+
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
 
@@ -861,7 +918,7 @@ namespace ClientServer_AsyncSelectModel
         }
 
         rc = WSAAsyncSelect(soc_listen, soc_window, WM_SOCKET, FD_ACCEPT | FD_CLOSE);
-        if (rc == SOCKET_ERROR)
+        if (rc)
         {
             WS_ERROR("Async select failed with code:", WSAGetLastError());
             return;
@@ -875,9 +932,29 @@ namespace ClientServer_AsyncSelectModel
             return;
         }
 
-        while (true)
+        MSG msg;
+        while (rc = GetMessage(&msg, NULL, 0, 0))
         {
+            if (rc == -1)
+            {
+                WS_ERROR("Get message failed with code:", GetLastError());
+                return;
+            }
 
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+
+            for (int i = 0; i < connected_sockets.size(); )
+            {
+                if (connected_sockets[i] == NULL)
+                {
+                    connected_sockets.erase(connected_sockets.begin() + i);
+                }
+                else
+                {
+                    i++;
+                }
+            }
         }
     }
 
