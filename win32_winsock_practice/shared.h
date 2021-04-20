@@ -40,11 +40,8 @@ enum ApplicationType
 
 enum PORTS
 {
-    SYNC_TCP_SERVER = 27015,
-    SYNC_UDP_SERVER = 27017,
-
-    ASYNC_TCP_SERVER = 10000,
-    ASYNC_UDP_SERVER = 10011
+    TCP_SERVER = 27015,
+    UDP_SERVER = 27017,
 };
 
 inline void WS_ERROR(std::string log, ApplicationType tag = SERVER)
@@ -67,7 +64,7 @@ inline void WS_LOG(std::string log, int code, ApplicationType tag = SERVER)
     std::cout << ((tag == SERVER) ? "[SERVER]" : "[CLIENT]") << log << " " << code << std::endl;
 }
 
-namespace ClientServerApplication_Sync
+namespace ClientServer_BlockingModel
 {
     auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
 
@@ -80,7 +77,7 @@ namespace ClientServerApplication_Sync
 
         sockaddr_in soc_listen_info = { 0 };
         soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::SYNC_TCP_SERVER);
+        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
         soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
 
         SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -185,7 +182,7 @@ namespace ClientServerApplication_Sync
 
         sockaddr_in soc_listen_info = { 0 };
         soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::SYNC_UDP_SERVER);
+        soc_listen_info.sin_port = htons(PORTS::UDP_SERVER);
         soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
 
         SOCKET soc_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -249,7 +246,7 @@ namespace ClientServerApplication_Sync
 
                 sockaddr_in server_info = { 0 };
                 server_info.sin_family = AF_INET;
-                server_info.sin_port = htons(PORTS::SYNC_TCP_SERVER);
+                server_info.sin_port = htons(PORTS::TCP_SERVER);
                 server_info.sin_addr.s_addr = inet_addr(server_ip.data());
 
                 SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -333,7 +330,7 @@ namespace ClientServerApplication_Sync
 
         sockaddr_in server_info = { 0 };
         server_info.sin_family = AF_INET;
-        server_info.sin_port = htons(PORTS::SYNC_UDP_SERVER);
+        server_info.sin_port = htons(PORTS::UDP_SERVER);
         server_info.sin_addr.s_addr = inet_addr("255.255.255.255");
 
         SOCKET soc_client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -378,7 +375,7 @@ namespace ClientServerApplication_Sync
     }
 }
 
-namespace ClientServerApplication_Async
+namespace ClientServer_SelectModel
 {
     auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
 
@@ -412,7 +409,7 @@ namespace ClientServerApplication_Async
 
         sockaddr_in soc_listen_info = { 0 };
         soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::ASYNC_TCP_SERVER);
+        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
         soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
 
         SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -447,7 +444,7 @@ namespace ClientServerApplication_Async
             return;
         }
 
-        std::vector<SOCKET_INFO*> sockets;
+        std::vector<SOCKET_INFO*> connected_sockets;
 
         fd_set fds_read;
         fd_set fds_write;
@@ -463,9 +460,9 @@ namespace ClientServerApplication_Async
 
             FD_SET(soc_listen, &fds_read);
 
-            for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
+            for (int i = 0; i < FD_SETSIZE && i < connected_sockets.size(); i++)
             {
-                SOCKET_INFO* socket_info = sockets[i];
+                SOCKET_INFO* socket_info = connected_sockets[i];
                 if (!socket_info)
                     continue;
 
@@ -509,13 +506,13 @@ namespace ClientServerApplication_Async
                         break;
                     }
 
-                    sockets.push_back(new SOCKET_INFO(soc_client));
+                    connected_sockets.push_back(new SOCKET_INFO(soc_client));
                 }
             }
 
-            for (int i = 0; i < FD_SETSIZE && i < sockets.size(); i++)
+            for (int i = 0; i < FD_SETSIZE && i < connected_sockets.size(); i++)
             {
-                SOCKET_INFO* socket_info = sockets[i];
+                SOCKET_INFO* socket_info = connected_sockets[i];
                 if (!socket_info)
                     continue;
 
@@ -527,7 +524,7 @@ namespace ClientServerApplication_Async
                         if (WSAGetLastError() == WSAEWOULDBLOCK)
                         {
                             WS_ERROR("recv failed with code:", WSAGetLastError());
-                            SAFE_DELETE(sockets[i]);
+                            SAFE_DELETE(connected_sockets[i]);
                         }
                         continue;
                     }
@@ -536,7 +533,7 @@ namespace ClientServerApplication_Async
                         socket_info->byte_recv = rc;
                         if (rc == 0)
                         {
-                            SAFE_DELETE(sockets[i]);
+                            SAFE_DELETE(connected_sockets[i]);
                             continue;
                         }
                     }
@@ -550,7 +547,7 @@ namespace ClientServerApplication_Async
                         if (WSAGetLastError() == WSAEWOULDBLOCK)
                         {
                             WS_ERROR("send failed with code:", WSAGetLastError());
-                            SAFE_DELETE(sockets[i]);
+                            SAFE_DELETE(connected_sockets[i]);
                         }
                         continue;
                     }
@@ -561,11 +558,11 @@ namespace ClientServerApplication_Async
                 }
             }
 
-            for (int i = 0; i < FD_SETSIZE && i < sockets.size(); )
+            for (int i = 0; i < FD_SETSIZE && i < connected_sockets.size(); )
             {
-                if (!sockets[i])
+                if (!connected_sockets[i])
                 {
-                    sockets.erase(sockets.begin() + i);
+                    connected_sockets.erase(connected_sockets.begin() + i);
                 }
                 else
                 {
@@ -584,7 +581,7 @@ namespace ClientServerApplication_Async
 
         sockaddr_in soc_listen_info = { 0 };
         soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::ASYNC_UDP_SERVER);
+        soc_listen_info.sin_port = htons(PORTS::UDP_SERVER);
         soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
 
         SOCKET soc_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -648,7 +645,7 @@ namespace ClientServerApplication_Async
 
                 sockaddr_in server_info = { 0 };
                 server_info.sin_family = AF_INET;
-                server_info.sin_port = htons(PORTS::ASYNC_TCP_SERVER);
+                server_info.sin_port = htons(PORTS::TCP_SERVER);
                 server_info.sin_addr.s_addr = inet_addr(server_ip.data());
 
                 int server_info_len = sizeof(server_info);
@@ -709,7 +706,1058 @@ namespace ClientServerApplication_Async
 
         sockaddr_in server_info = { 0 };
         server_info.sin_family = AF_INET;
-        server_info.sin_port = htons(PORTS::ASYNC_UDP_SERVER);
+        server_info.sin_port = htons(PORTS::UDP_SERVER);
+        server_info.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+        SOCKET soc_client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_client == INVALID_SOCKET)
+        {
+            WS_ERROR("create socket failed with code:", WSAGetLastError(), CLIENT);
+            return;
+        }
+
+        BOOL b_broadcast = TRUE;
+        setsockopt(soc_client, SOL_SOCKET, SO_BROADCAST, (char*)&b_broadcast, sizeof(BOOL));
+
+        char buffer[1024];
+        memset(buffer, 0, sizeof(buffer));
+        strcpy(buffer, "server_ip_request");
+
+        rc = sendto(soc_client, buffer, sizeof(buffer), 0, (SOCKADDR*)&server_info, sizeof(server_info));
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("sendto failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        memset(buffer, 0, 1024);
+        int server_info_len = sizeof(server_info);
+        rc = recvfrom(soc_client, buffer, 1024, 0, (SOCKADDR*)&server_info, &server_info_len);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("recvfrom failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        f_prompt("TCP server IP: ");
+        f_prompt(buffer);
+        f_prompt("\n");
+
+        p_server_ip.set_value(buffer);
+
+        closesocket(soc_client);
+    }
+}
+
+namespace ClientServer_AsyncSelectModel
+{
+    auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
+
+    class SOCKET_INFO
+    {
+    public:
+        SOCKET socket;
+        char buffer[1024];
+        DWORD byte_recv;
+
+        SOCKET_INFO(SOCKET s)
+        {
+            socket = s;
+            byte_recv = 0;
+            memset(buffer, 0, 1024);
+        }
+
+        void ResetData()
+        {
+            memset(buffer, 0, 1024);
+            byte_recv = 0;
+        }
+    };
+
+    LRESULT CALLBACK TCP_Server_Proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+    {
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+
+    HWND CreateServerWindow(void)
+    {
+        WNDCLASS cls;
+        cls.style = CS_HREDRAW | CS_VREDRAW;
+        cls.lpfnWndProc = (WNDPROC)TCP_Server_Proc;
+        cls.cbClsExtra = 0;
+        cls.cbWndExtra = 0;
+        cls.hInstance = NULL;
+        cls.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+        cls.hCursor = LoadCursor(NULL, IDC_ARROW);
+        cls.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+        cls.lpszMenuName = NULL;
+        cls.lpszClassName = L"Async Select Model";
+
+        if (RegisterClass(&cls) == 0)
+        {
+            WS_ERROR("register wnd class failed with code:", GetLastError());
+            return NULL;
+        }
+
+        HWND window = CreateWindow(
+            L"Async Select Model", 
+            L"", 
+            WS_OVERLAPPEDWINDOW, 
+            CW_USEDEFAULT, 
+            CW_USEDEFAULT, 
+            CW_USEDEFAULT, 
+            CW_USEDEFAULT, 
+            NULL, 
+            NULL, 
+            NULL, 
+            NULL
+        );
+
+        if (window == NULL)
+        {
+            WS_ERROR("Create HWND failed with code:", GetLastError());
+        }
+
+        return window;
+    }
+
+    void TCP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("socket failed with error code:", WSAGetLastError());
+            return;
+        }
+
+        unsigned long io_non_block_mode = 1;
+        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = listen(soc_listen, 8);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("listen failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        
+    }
+
+    void UDP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::UDP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("create udp socket failed with code:", WSAGetLastError());
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        char buffer[1024];
+        int buffer_len = 1024;
+        while (true)
+        {
+            memset(buffer, 0, buffer_len);
+
+            sockaddr_in client_info = { 0 };
+            int client_info_len = sizeof(client_info);
+            rc = recvfrom(soc_listen, buffer, buffer_len, 0, (SOCKADDR*)&client_info, &client_info_len);
+            if (rc == SOCKET_ERROR)
+            {
+                WS_ERROR("recvfrom failed with code:", WSAGetLastError());
+                break;
+            }
+
+            if (std::string(buffer) == std::string("server_ip_request"))
+            {
+                memset(buffer, 0, 1024);
+                strcpy(buffer, serverIP);
+                rc = sendto(soc_listen, buffer, 1024, 0, (SOCKADDR*)&client_info, client_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("sendto failed with code:", WSAGetLastError());
+                    break;
+                }
+            }
+        }
+
+        closesocket(soc_listen);
+    }
+
+    void TCP_Client(const std::string& server_ip)
+    {
+        std::string command;
+        while (f_prompt("Enter command: ") && std::getline(std::cin, command))
+        {
+            if (command == "exit")
+            {
+                break;
+            }
+            else if (command == "connect")
+            {
+                int rc;
+
+                sockaddr_in server_info = { 0 };
+                server_info.sin_family = AF_INET;
+                server_info.sin_port = htons(PORTS::TCP_SERVER);
+                server_info.sin_addr.s_addr = inet_addr(server_ip.data());
+
+                int server_info_len = sizeof(server_info);
+
+                SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                if (soc_client == INVALID_SOCKET)
+                {
+                    WS_ERROR("create socket client failed with code:", WSAGetLastError(), CLIENT);
+                    return;
+                }
+
+                rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
+                    closesocket(soc_client);
+                    return;
+                }
+
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+                }
+
+                closesocket(soc_client);
+            }
+            else
+            {
+                WS_LOG("Invalid command", CLIENT);
+            }
+        }
+    }
+
+    void UDP_Client(std::promise<std::string>& p_server_ip)
+    {
+        int rc;
+
+        sockaddr_in server_info = { 0 };
+        server_info.sin_family = AF_INET;
+        server_info.sin_port = htons(PORTS::UDP_SERVER);
+        server_info.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+        SOCKET soc_client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_client == INVALID_SOCKET)
+        {
+            WS_ERROR("create socket failed with code:", WSAGetLastError(), CLIENT);
+            return;
+        }
+
+        BOOL b_broadcast = TRUE;
+        setsockopt(soc_client, SOL_SOCKET, SO_BROADCAST, (char*)&b_broadcast, sizeof(BOOL));
+
+        char buffer[1024];
+        memset(buffer, 0, sizeof(buffer));
+        strcpy(buffer, "server_ip_request");
+
+        rc = sendto(soc_client, buffer, sizeof(buffer), 0, (SOCKADDR*)&server_info, sizeof(server_info));
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("sendto failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        memset(buffer, 0, 1024);
+        int server_info_len = sizeof(server_info);
+        rc = recvfrom(soc_client, buffer, 1024, 0, (SOCKADDR*)&server_info, &server_info_len);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("recvfrom failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        f_prompt("TCP server IP: ");
+        f_prompt(buffer);
+        f_prompt("\n");
+
+        p_server_ip.set_value(buffer);
+
+        closesocket(soc_client);
+    }
+}
+
+namespace ClientServer_EventSelectModel
+{
+    auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
+
+    class SOCKET_INFO
+    {
+    public:
+        SOCKET socket;
+        char buffer[1024];
+        DWORD byte_recv;
+
+        SOCKET_INFO(SOCKET s)
+        {
+            socket = s;
+            byte_recv = 0;
+            memset(buffer, 0, 1024);
+        }
+
+        void ResetData()
+        {
+            memset(buffer, 0, 1024);
+            byte_recv = 0;
+        }
+    };
+
+    void TCP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("socket failed with error code:", WSAGetLastError());
+            return;
+        }
+
+        unsigned long io_non_block_mode = 1;
+        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = listen(soc_listen, 8);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("listen failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        
+    }
+
+    void UDP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::UDP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("create udp socket failed with code:", WSAGetLastError());
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        char buffer[1024];
+        int buffer_len = 1024;
+        while (true)
+        {
+            memset(buffer, 0, buffer_len);
+
+            sockaddr_in client_info = { 0 };
+            int client_info_len = sizeof(client_info);
+            rc = recvfrom(soc_listen, buffer, buffer_len, 0, (SOCKADDR*)&client_info, &client_info_len);
+            if (rc == SOCKET_ERROR)
+            {
+                WS_ERROR("recvfrom failed with code:", WSAGetLastError());
+                break;
+            }
+
+            if (std::string(buffer) == std::string("server_ip_request"))
+            {
+                memset(buffer, 0, 1024);
+                strcpy(buffer, serverIP);
+                rc = sendto(soc_listen, buffer, 1024, 0, (SOCKADDR*)&client_info, client_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("sendto failed with code:", WSAGetLastError());
+                    break;
+                }
+            }
+        }
+
+        closesocket(soc_listen);
+    }
+
+    void TCP_Client(const std::string& server_ip)
+    {
+        std::string command;
+        while (f_prompt("Enter command: ") && std::getline(std::cin, command))
+        {
+            if (command == "exit")
+            {
+                break;
+            }
+            else if (command == "connect")
+            {
+                int rc;
+
+                sockaddr_in server_info = { 0 };
+                server_info.sin_family = AF_INET;
+                server_info.sin_port = htons(PORTS::TCP_SERVER);
+                server_info.sin_addr.s_addr = inet_addr(server_ip.data());
+
+                int server_info_len = sizeof(server_info);
+
+                SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                if (soc_client == INVALID_SOCKET)
+                {
+                    WS_ERROR("create socket client failed with code:", WSAGetLastError(), CLIENT);
+                    return;
+                }
+
+                rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
+                    closesocket(soc_client);
+                    return;
+                }
+
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+                }
+
+                closesocket(soc_client);
+            }
+            else
+            {
+                WS_LOG("Invalid command", CLIENT);
+            }
+        }
+    }
+
+    void UDP_Client(std::promise<std::string>& p_server_ip)
+    {
+        int rc;
+
+        sockaddr_in server_info = { 0 };
+        server_info.sin_family = AF_INET;
+        server_info.sin_port = htons(PORTS::UDP_SERVER);
+        server_info.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+        SOCKET soc_client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_client == INVALID_SOCKET)
+        {
+            WS_ERROR("create socket failed with code:", WSAGetLastError(), CLIENT);
+            return;
+        }
+
+        BOOL b_broadcast = TRUE;
+        setsockopt(soc_client, SOL_SOCKET, SO_BROADCAST, (char*)&b_broadcast, sizeof(BOOL));
+
+        char buffer[1024];
+        memset(buffer, 0, sizeof(buffer));
+        strcpy(buffer, "server_ip_request");
+
+        rc = sendto(soc_client, buffer, sizeof(buffer), 0, (SOCKADDR*)&server_info, sizeof(server_info));
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("sendto failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        memset(buffer, 0, 1024);
+        int server_info_len = sizeof(server_info);
+        rc = recvfrom(soc_client, buffer, 1024, 0, (SOCKADDR*)&server_info, &server_info_len);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("recvfrom failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        f_prompt("TCP server IP: ");
+        f_prompt(buffer);
+        f_prompt("\n");
+
+        p_server_ip.set_value(buffer);
+
+        closesocket(soc_client);
+    }
+}
+
+namespace ClientServer_OverlappedModel
+{
+    auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
+
+    class SOCKET_INFO
+    {
+    public:
+        SOCKET socket;
+        char buffer[1024];
+        DWORD byte_recv;
+
+        SOCKET_INFO(SOCKET s)
+        {
+            socket = s;
+            byte_recv = 0;
+            memset(buffer, 0, 1024);
+        }
+
+        void ResetData()
+        {
+            memset(buffer, 0, 1024);
+            byte_recv = 0;
+        }
+    };
+
+    void TCP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("socket failed with error code:", WSAGetLastError());
+            return;
+        }
+
+        unsigned long io_non_block_mode = 1;
+        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = listen(soc_listen, 8);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("listen failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        
+    }
+
+    void UDP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::UDP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("create udp socket failed with code:", WSAGetLastError());
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        char buffer[1024];
+        int buffer_len = 1024;
+        while (true)
+        {
+            memset(buffer, 0, buffer_len);
+
+            sockaddr_in client_info = { 0 };
+            int client_info_len = sizeof(client_info);
+            rc = recvfrom(soc_listen, buffer, buffer_len, 0, (SOCKADDR*)&client_info, &client_info_len);
+            if (rc == SOCKET_ERROR)
+            {
+                WS_ERROR("recvfrom failed with code:", WSAGetLastError());
+                break;
+            }
+
+            if (std::string(buffer) == std::string("server_ip_request"))
+            {
+                memset(buffer, 0, 1024);
+                strcpy(buffer, serverIP);
+                rc = sendto(soc_listen, buffer, 1024, 0, (SOCKADDR*)&client_info, client_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("sendto failed with code:", WSAGetLastError());
+                    break;
+                }
+            }
+        }
+
+        closesocket(soc_listen);
+    }
+
+    void TCP_Client(const std::string& server_ip)
+    {
+        std::string command;
+        while (f_prompt("Enter command: ") && std::getline(std::cin, command))
+        {
+            if (command == "exit")
+            {
+                break;
+            }
+            else if (command == "connect")
+            {
+                int rc;
+
+                sockaddr_in server_info = { 0 };
+                server_info.sin_family = AF_INET;
+                server_info.sin_port = htons(PORTS::TCP_SERVER);
+                server_info.sin_addr.s_addr = inet_addr(server_ip.data());
+
+                int server_info_len = sizeof(server_info);
+
+                SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                if (soc_client == INVALID_SOCKET)
+                {
+                    WS_ERROR("create socket client failed with code:", WSAGetLastError(), CLIENT);
+                    return;
+                }
+
+                rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
+                    closesocket(soc_client);
+                    return;
+                }
+
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+                }
+
+                closesocket(soc_client);
+            }
+            else
+            {
+                WS_LOG("Invalid command", CLIENT);
+            }
+        }
+    }
+
+    void UDP_Client(std::promise<std::string>& p_server_ip)
+    {
+        int rc;
+
+        sockaddr_in server_info = { 0 };
+        server_info.sin_family = AF_INET;
+        server_info.sin_port = htons(PORTS::UDP_SERVER);
+        server_info.sin_addr.s_addr = inet_addr("255.255.255.255");
+
+        SOCKET soc_client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_client == INVALID_SOCKET)
+        {
+            WS_ERROR("create socket failed with code:", WSAGetLastError(), CLIENT);
+            return;
+        }
+
+        BOOL b_broadcast = TRUE;
+        setsockopt(soc_client, SOL_SOCKET, SO_BROADCAST, (char*)&b_broadcast, sizeof(BOOL));
+
+        char buffer[1024];
+        memset(buffer, 0, sizeof(buffer));
+        strcpy(buffer, "server_ip_request");
+
+        rc = sendto(soc_client, buffer, sizeof(buffer), 0, (SOCKADDR*)&server_info, sizeof(server_info));
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("sendto failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        memset(buffer, 0, 1024);
+        int server_info_len = sizeof(server_info);
+        rc = recvfrom(soc_client, buffer, 1024, 0, (SOCKADDR*)&server_info, &server_info_len);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("recvfrom failed with code:", WSAGetLastError(), CLIENT);
+            closesocket(soc_client);
+            return;
+        }
+
+        f_prompt("TCP server IP: ");
+        f_prompt(buffer);
+        f_prompt("\n");
+
+        p_server_ip.set_value(buffer);
+
+        closesocket(soc_client);
+    }
+}
+
+namespace ClientServer_CompletionPortModel
+{
+    auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
+
+    class SOCKET_INFO
+    {
+    public:
+        SOCKET socket;
+        char buffer[1024];
+        DWORD byte_recv;
+
+        SOCKET_INFO(SOCKET s)
+        {
+            socket = s;
+            byte_recv = 0;
+            memset(buffer, 0, 1024);
+        }
+
+        void ResetData()
+        {
+            memset(buffer, 0, 1024);
+            byte_recv = 0;
+        }
+    };
+
+    void TCP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("socket failed with error code:", WSAGetLastError());
+            return;
+        }
+
+        unsigned long io_non_block_mode = 1;
+        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        rc = listen(soc_listen, 8);
+        if (rc == SOCKET_ERROR)
+        {
+            WS_ERROR("listen failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        
+    }
+
+    void UDP_Server()
+    {
+        int rc;
+
+        hostent* he = gethostbyname("");
+        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
+
+        sockaddr_in soc_listen_info = { 0 };
+        soc_listen_info.sin_family = AF_INET;
+        soc_listen_info.sin_port = htons(PORTS::UDP_SERVER);
+        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+
+        SOCKET soc_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("create udp socket failed with code:", WSAGetLastError());
+            return;
+        }
+
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        if (rc)
+        {
+            WS_ERROR("bind failed with error code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        char buffer[1024];
+        int buffer_len = 1024;
+        while (true)
+        {
+            memset(buffer, 0, buffer_len);
+
+            sockaddr_in client_info = { 0 };
+            int client_info_len = sizeof(client_info);
+            rc = recvfrom(soc_listen, buffer, buffer_len, 0, (SOCKADDR*)&client_info, &client_info_len);
+            if (rc == SOCKET_ERROR)
+            {
+                WS_ERROR("recvfrom failed with code:", WSAGetLastError());
+                break;
+            }
+
+            if (std::string(buffer) == std::string("server_ip_request"))
+            {
+                memset(buffer, 0, 1024);
+                strcpy(buffer, serverIP);
+                rc = sendto(soc_listen, buffer, 1024, 0, (SOCKADDR*)&client_info, client_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("sendto failed with code:", WSAGetLastError());
+                    break;
+                }
+            }
+        }
+
+        closesocket(soc_listen);
+    }
+
+    void TCP_Client(const std::string& server_ip)
+    {
+        std::string command;
+        while (f_prompt("Enter command: ") && std::getline(std::cin, command))
+        {
+            if (command == "exit")
+            {
+                break;
+            }
+            else if (command == "connect")
+            {
+                int rc;
+
+                sockaddr_in server_info = { 0 };
+                server_info.sin_family = AF_INET;
+                server_info.sin_port = htons(PORTS::TCP_SERVER);
+                server_info.sin_addr.s_addr = inet_addr(server_ip.data());
+
+                int server_info_len = sizeof(server_info);
+
+                SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                if (soc_client == INVALID_SOCKET)
+                {
+                    WS_ERROR("create socket client failed with code:", WSAGetLastError(), CLIENT);
+                    return;
+                }
+
+                rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
+                    closesocket(soc_client);
+                    return;
+                }
+
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+                }
+
+                closesocket(soc_client);
+            }
+            else
+            {
+                WS_LOG("Invalid command", CLIENT);
+            }
+        }
+    }
+
+    void UDP_Client(std::promise<std::string>& p_server_ip)
+    {
+        int rc;
+
+        sockaddr_in server_info = { 0 };
+        server_info.sin_family = AF_INET;
+        server_info.sin_port = htons(PORTS::UDP_SERVER);
         server_info.sin_addr.s_addr = inet_addr("255.255.255.255");
 
         SOCKET soc_client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);

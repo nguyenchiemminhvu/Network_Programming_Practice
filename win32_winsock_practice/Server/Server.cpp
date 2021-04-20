@@ -23,8 +23,8 @@ int main()
         std::cout << "Server's IP Address: " << inet_ntoa(add) << std::endl;
     }
 
-    std::thread udp_server(ClientServerApplication_Async::UDP_Server);
-    std::thread tcp_server(ClientServerApplication_Async::TCP_Server);
+    std::thread udp_server(ClientServer_AsyncSelectModel::UDP_Server);
+    std::thread tcp_server(ClientServer_AsyncSelectModel::TCP_Server);
 
     if (udp_server.joinable())
     {
