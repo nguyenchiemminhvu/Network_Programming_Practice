@@ -784,6 +784,9 @@ namespace ClientServer_AsyncSelectModel
 
     LRESULT CALLBACK TCP_Socket_Event_Handler(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
+        int rc = 0;
+        int i;
+
         if (WSAGETSELECTERROR(lParam))
         {
             if (WSAGetLastError())
@@ -798,32 +801,91 @@ namespace ClientServer_AsyncSelectModel
             return -1;
         }
 
-        SOCKET connected = INVALID_SOCKET;
+        SOCKET_INFO * connected = NULL;
 
         switch (WSAGETSELECTEVENT(lParam))
         {
         case FD_ACCEPT:
-            connected = accept((SOCKET)wParam, NULL, NULL);
-            if (connected == INVALID_SOCKET)
+            connected = new SOCKET_INFO(accept((SOCKET)wParam, NULL, NULL));
+            if (connected->socket == INVALID_SOCKET)
             {
                 WS_ERROR("accept failed with code:", WSAGetLastError());
                 return -1;
             }
-            WSAAsyncSelect(connected, hwnd, WM_SOCKET, FD_READ | FD_WRITE | FD_CLOSE);
-            connected_sockets.push_back(new SOCKET_INFO(connected));
+            WSAAsyncSelect(connected->socket, hwnd, WM_SOCKET, FD_READ | FD_WRITE | FD_CLOSE);
+            connected_sockets.push_back(connected);
             break;
 
         case FD_READ:
+            for (i = 0; i < connected_sockets.size(); i++)
+            {
+                if (wParam == connected_sockets[i]->socket)
+                {
+                    connected = connected_sockets[i];
+                    break;
+                }
+            }
             
+            if (connected->byte_recv)
+            {
+                return 0;
+            }
+            
+            rc = recv(connected->socket, connected->buffer, 1024, 0);
+            if (rc == SOCKET_ERROR)
+            {
+                if (WSAGetLastError() != WSAEWOULDBLOCK)
+                {
+                    WS_ERROR("recv failed with code:", WSAGetLastError());
+                    closesocket((SOCKET)wParam);
+                    SAFE_DELETE(connected_sockets[i]);
+                    connected_sockets.erase(connected_sockets.begin() + i);
+                    return 0;
+                }
+            }
+            else
+            {
+                connected->byte_recv = rc;
+                PostMessage(hwnd, WM_SOCKET, wParam, FD_WRITE);
+            }
+
             break;
 
         case FD_WRITE:
+            for (i = 0; i < connected_sockets.size(); i++)
+            {
+                if (wParam == connected_sockets[i]->socket)
+                {
+                    connected = connected_sockets[i];
+                    break;
+                }
+            }
+
+            if (connected->byte_recv == 0)
+                return 0;
             
+            rc = send(connected->socket, connected->buffer, 1024, 0);
+            if (rc == SOCKET_ERROR)
+            {
+                if (WSAGetLastError() != WSAEWOULDBLOCK)
+                {
+                    closesocket((SOCKET)wParam);
+                    SAFE_DELETE(connected_sockets[i]);
+                    connected_sockets.erase(connected_sockets.begin() + i);
+                    return 0;
+                }
+            }
+            else
+            {
+                connected_sockets[i]->ResetData();
+                PostMessage(hwnd, WM_SOCKET, wParam, FD_READ);
+            }
+
             break;
 
         case FD_CLOSE:
             WS_LOG("close socket", wParam);
-            for (int i = 0; i < connected_sockets.size(); )
+            for (i = 0; i < connected_sockets.size(); )
             {
                 if (connected_sockets[i]->socket == wParam)
                 {
@@ -841,6 +903,8 @@ namespace ClientServer_AsyncSelectModel
         default:
             break;
         }
+
+        return 0;
     }
 
     LRESULT CALLBACK TCP_Server_Proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
