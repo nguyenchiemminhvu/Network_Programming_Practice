@@ -816,12 +816,17 @@ namespace ClientServer_AsyncSelectModel
 
         case FD_CLOSE:
             WS_LOG("close socket", wParam);
-            for (int i = 0; i < connected_sockets.size(); i++)
+            for (int i = 0; i < connected_sockets.size(); )
             {
                 if (connected_sockets[i]->socket == wParam)
                 {
                     closesocket(connected_sockets[i]->socket);
                     SAFE_DELETE(connected_sockets[i]);
+                    connected_sockets.erase(connected_sockets.begin() + i);
+                }
+                else
+                {
+                    i++;
                 }
             }
             break;
@@ -943,18 +948,6 @@ namespace ClientServer_AsyncSelectModel
 
             TranslateMessage(&msg);
             DispatchMessage(&msg);
-
-            for (int i = 0; i < connected_sockets.size(); )
-            {
-                if (connected_sockets[i] == NULL)
-                {
-                    connected_sockets.erase(connected_sockets.begin() + i);
-                }
-                else
-                {
-                    i++;
-                }
-            }
         }
     }
 
