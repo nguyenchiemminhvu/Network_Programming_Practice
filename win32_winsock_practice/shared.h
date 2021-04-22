@@ -786,7 +786,14 @@ namespace ClientServer_AsyncSelectModel
     {
         if (WSAGETSELECTERROR(lParam))
         {
-            WS_ERROR("Error in socket event handler:", WSAGetLastError());
+            if (WSAGetLastError())
+            {
+                WS_ERROR("Error in socket event handler:", WSAGetLastError());
+            }
+            else
+            {
+                WS_LOG("Client disconnected:", wParam);
+            }
             closesocket((SOCKET)wParam);
             return -1;
         }
