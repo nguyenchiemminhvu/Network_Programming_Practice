@@ -1262,6 +1262,9 @@ namespace ClientServer_EventSelectModel
             return;
         }
 
+        WSAEVENT event_listen = WSACreateEvent();
+        WSAEventSelect(soc_listen, event_listen, FD_ACCEPT | FD_CLOSE);
+
         rc = listen(soc_listen, 8);
         if (rc == SOCKET_ERROR)
         {
@@ -1269,8 +1272,11 @@ namespace ClientServer_EventSelectModel
             closesocket(soc_listen);
             return;
         }
-
         
+        while (true)
+        {
+
+        }
     }
 
     void UDP_Server()
