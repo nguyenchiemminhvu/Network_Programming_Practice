@@ -1262,8 +1262,14 @@ namespace ClientServer_EventSelectModel
             return;
         }
 
+        std::vector<WSAEVENT> events;
+        std::vector<SOCKET_INFO*> connected_sockets;
+
         WSAEVENT event_listen = WSACreateEvent();
         WSAEventSelect(soc_listen, event_listen, FD_ACCEPT | FD_CLOSE);
+
+        events.push_back(event_listen);
+        connected_sockets.push_back(new SOCKET_INFO(soc_listen));
 
         rc = listen(soc_listen, 8);
         if (rc == SOCKET_ERROR)
@@ -1275,7 +1281,10 @@ namespace ClientServer_EventSelectModel
         
         while (true)
         {
+            int idx = WSAWaitForMultipleEvents(events.size(), (HANDLE*)&events[0], FALSE, WSA_INFINITE, FALSE);
+            idx = events.size() - WSA_WAIT_EVENT_0;
 
+            WS_LOG("11111");
         }
     }
 
