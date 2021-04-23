@@ -1262,13 +1262,14 @@ namespace ClientServer_EventSelectModel
             return;
         }
 
-        std::vector<WSAEVENT> events;
+        WSANETWORKEVENTS network_event;
+        std::vector<WSAEVENT> socket_events;
         std::vector<SOCKET_INFO*> connected_sockets;
 
         WSAEVENT event_listen = WSACreateEvent();
         WSAEventSelect(soc_listen, event_listen, FD_ACCEPT | FD_CLOSE);
 
-        events.push_back(event_listen);
+        socket_events.push_back(event_listen);
         connected_sockets.push_back(new SOCKET_INFO(soc_listen));
 
         rc = listen(soc_listen, 8);
@@ -1281,10 +1282,31 @@ namespace ClientServer_EventSelectModel
         
         while (true)
         {
-            int idx = WSAWaitForMultipleEvents(events.size(), (HANDLE*)&events[0], FALSE, WSA_INFINITE, FALSE);
-            idx = events.size() - WSA_WAIT_EVENT_0;
+            int idx = WSAWaitForMultipleEvents(socket_events.size(), (HANDLE*)&socket_events[0], FALSE, WSA_INFINITE, FALSE);
+            idx = (socket_events.size() - 1) - WSA_WAIT_EVENT_0;
 
-            WS_LOG("11111");
+            rc = WSAEnumNetworkEvents(connected_sockets[idx]->socket, socket_events[idx], &network_event);
+            if (rc == SOCKET_ERROR)
+            {
+                WS_ERROR("WSAEnumNetworkEvents failed with code:", WSAGetLastError());
+                return;
+            }
+
+            if (network_event.lNetworkEvents & FD_ACCEPT)
+            {
+                SOCKET s = accept(connected_sockets[idx]->socket, NULL, NULL);
+                closesocket(s);
+            }
+
+            if (network_event.lNetworkEvents & FD_CLOSE)
+            {
+                
+            }
+
+            if (network_event.lNetworkEvents & FD_READ || network_event.lNetworkEvents & FD_WRITE)
+            {
+
+            }
         }
     }
 
