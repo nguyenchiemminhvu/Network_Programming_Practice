@@ -1283,6 +1283,12 @@ namespace ClientServer_EventSelectModel
         while (true)
         {
             int rc = WSAWaitForMultipleEvents(socket_events.size(), (HANDLE*)&socket_events[0], FALSE, WSA_INFINITE, FALSE);
+            if (rc == WSA_WAIT_FAILED)
+            {
+                WS_ERROR("Wait for socket events failed with code:", WSAGetLastError());
+                return;
+            }
+
             int idx = rc - WSA_WAIT_EVENT_0;
 
             rc = WSAEnumNetworkEvents(connected_sockets[idx]->socket, socket_events[idx], &network_event);
@@ -1317,10 +1323,10 @@ namespace ClientServer_EventSelectModel
                     continue;
                 }
 
-                WSAEventSelect(s, e, FD_READ | FD_WRITE | FD_CLOSE);
-
                 socket_events.push_back(e);
                 connected_sockets.push_back(new SOCKET_INFO(s));
+
+                WSAEventSelect(connected_sockets.back()->socket, socket_events.back(), FD_READ | FD_WRITE | FD_CLOSE);
             }
 
             if (network_event.lNetworkEvents & FD_READ)
@@ -1330,6 +1336,20 @@ namespace ClientServer_EventSelectModel
                     WS_ERROR("FD_READ failed with code:", network_event.iErrorCode[FD_READ_BIT]);
                     break;
                 }
+
+                SOCKET_INFO* soc_info = connected_sockets[idx];
+                if (soc_info)
+                {
+                    soc_info->ResetData();
+                    rc = recv(soc_info->socket, soc_info->buffer, 1024, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        continue;
+                    }
+
+                    soc_info->byte_recv = rc;
+                }
             }
 
             if (network_event.lNetworkEvents & FD_WRITE)
@@ -1338,6 +1358,19 @@ namespace ClientServer_EventSelectModel
                 {
                     WS_ERROR("FD_WRITE failed with code:", network_event.iErrorCode[FD_WRITE_BIT]);
                     break;
+                }
+
+                SOCKET_INFO* soc_info = connected_sockets[idx];
+                if (soc_info)
+                {
+                    rc = send(soc_info->socket, soc_info->buffer, 1024, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_ERROR("send failed with code:", WSAGetLastError());
+                        continue;
+                    }
+
+                    soc_info->ResetData();
                 }
             }
 
@@ -1355,6 +1388,20 @@ namespace ClientServer_EventSelectModel
                 SAFE_DELETE(connected_sockets[idx]);
                 connected_sockets.erase(connected_sockets.begin() + idx);
                 socket_events.erase(socket_events.begin() + idx);
+            }
+
+            for (int i = 0; i < connected_sockets.size(); )
+            {
+                if (connected_sockets[i] == NULL)
+                {
+                    connected_sockets.erase(connected_sockets.begin() + i);
+                    WSACloseEvent(socket_events[i]);
+                    socket_events.erase(socket_events.begin() + i);
+                }
+                else
+                {
+                    i++;
+                }
             }
         }
     }
@@ -1452,31 +1499,33 @@ namespace ClientServer_EventSelectModel
                     return;
                 }
 
-                //for (int i = 0; i < 10; i++)
-                //{
-                //    char buffer[1024];
-                //    int buffer_len = 1024;
-                //    memset(buffer, 0, buffer_len);
-                //    strcpy(buffer, "request_data_from_client");
-                //    rc = send(soc_client, buffer, buffer_len, 0);
-                //    if (rc == SOCKET_ERROR)
-                //    {
-                //        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
-                //        break;
-                //    }
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
 
-                //    memset(buffer, 0, buffer_len);
-                //    rc = recv(soc_client, buffer, buffer_len, 0);
-                //    if (rc == SOCKET_ERROR)
-                //    {
-                //        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                //        break;
-                //    }
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
 
-                //    f_prompt("Received data from server: ");
-                //    f_prompt(buffer);
-                //    f_prompt("\n");
-                //}
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+
+                    Sleep(100);
+                }
 
                 closesocket(soc_client);
             }
