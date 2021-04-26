@@ -1329,32 +1329,15 @@ namespace ClientServer_EventSelectModel
                 WSAEventSelect(connected_sockets.back()->socket, socket_events.back(), FD_READ | FD_WRITE | FD_CLOSE);
             }
 
-            if (network_event.lNetworkEvents & FD_READ)
+            if (network_event.lNetworkEvents & FD_READ || network_event.lNetworkEvents & FD_WRITE)
             {
-                if (network_event.iErrorCode[FD_READ_BIT])
+                if (network_event.lNetworkEvents & FD_READ && network_event.iErrorCode[FD_READ_BIT])
                 {
                     WS_ERROR("FD_READ failed with code:", network_event.iErrorCode[FD_READ_BIT]);
                     break;
                 }
 
-                SOCKET_INFO* soc_info = connected_sockets[idx];
-                if (soc_info)
-                {
-                    soc_info->ResetData();
-                    rc = recv(soc_info->socket, soc_info->buffer, 1024, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                        continue;
-                    }
-
-                    soc_info->byte_recv = rc;
-                }
-            }
-
-            if (network_event.lNetworkEvents & FD_WRITE)
-            {
-                if (network_event.iErrorCode[FD_WRITE_BIT])
+                if (network_event.lNetworkEvents & FD_WRITE && network_event.iErrorCode[FD_WRITE_BIT])
                 {
                     WS_ERROR("FD_WRITE failed with code:", network_event.iErrorCode[FD_WRITE_BIT]);
                     break;
@@ -1363,14 +1346,29 @@ namespace ClientServer_EventSelectModel
                 SOCKET_INFO* soc_info = connected_sockets[idx];
                 if (soc_info)
                 {
-                    rc = send(soc_info->socket, soc_info->buffer, 1024, 0);
-                    if (rc == SOCKET_ERROR)
+                    if (soc_info->byte_recv == 0)
                     {
-                        WS_ERROR("send failed with code:", WSAGetLastError());
-                        continue;
+                        rc = recv(soc_info->socket, soc_info->buffer, 1024, 0);
+                        if (rc == SOCKET_ERROR)
+                        {
+                            WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                            continue;
+                        }
+
+                        soc_info->byte_recv = rc;
                     }
 
-                    soc_info->ResetData();
+                    if (soc_info->byte_recv > 0)
+                    {
+                        rc = send(soc_info->socket, soc_info->buffer, 1024, 0);
+                        if (rc == SOCKET_ERROR)
+                        {
+                            WS_ERROR("send failed with code:", WSAGetLastError());
+                            continue;
+                        }
+
+                        soc_info->ResetData();
+                    }
                 }
             }
 
@@ -1523,8 +1521,6 @@ namespace ClientServer_EventSelectModel
                     f_prompt("Received data from server: ");
                     f_prompt(buffer);
                     f_prompt("\n");
-
-                    Sleep(100);
                 }
 
                 closesocket(soc_client);
