@@ -1334,12 +1334,14 @@ namespace ClientServer_EventSelectModel
                 if (network_event.lNetworkEvents & FD_READ && network_event.iErrorCode[FD_READ_BIT])
                 {
                     WS_ERROR("FD_READ failed with code:", network_event.iErrorCode[FD_READ_BIT]);
+                    closesocket(connected_sockets[idx]->socket);
                     SAFE_DELETE(connected_sockets[idx]);
                 }
 
                 if (network_event.lNetworkEvents & FD_WRITE && network_event.iErrorCode[FD_WRITE_BIT])
                 {
                     WS_ERROR("FD_WRITE failed with code:", network_event.iErrorCode[FD_WRITE_BIT]);
+                    closesocket(connected_sockets[idx]->socket);
                     SAFE_DELETE(connected_sockets[idx]);
                 }
 
