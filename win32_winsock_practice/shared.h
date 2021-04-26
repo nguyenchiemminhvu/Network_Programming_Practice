@@ -1268,7 +1268,7 @@ namespace ClientServer_EventSelectModel
 
         WSAEVENT event_listen = WSACreateEvent();
         WSAEventSelect(soc_listen, event_listen, FD_ACCEPT | FD_CLOSE);
-
+        
         socket_events.push_back(event_listen);
         connected_sockets.push_back(new SOCKET_INFO(soc_listen));
 
@@ -1282,8 +1282,8 @@ namespace ClientServer_EventSelectModel
         
         while (true)
         {
-            int idx = WSAWaitForMultipleEvents(socket_events.size(), (HANDLE*)&socket_events[0], FALSE, WSA_INFINITE, FALSE);
-            idx = (socket_events.size() - 1) - WSA_WAIT_EVENT_0;
+            int rc = WSAWaitForMultipleEvents(socket_events.size(), (HANDLE*)&socket_events[0], FALSE, WSA_INFINITE, FALSE);
+            int idx = rc - WSA_WAIT_EVENT_0;
 
             rc = WSAEnumNetworkEvents(connected_sockets[idx]->socket, socket_events[idx], &network_event);
             if (rc == SOCKET_ERROR)
@@ -1294,18 +1294,78 @@ namespace ClientServer_EventSelectModel
 
             if (network_event.lNetworkEvents & FD_ACCEPT)
             {
+                if (network_event.iErrorCode[FD_ACCEPT_BIT])
+                {
+                    WS_ERROR("FD_ACCEPT failed with code:", network_event.iErrorCode[FD_ACCEPT_BIT]);
+                    break;
+                }
+
                 SOCKET s = accept(connected_sockets[idx]->socket, NULL, NULL);
-                closesocket(s);
+                if (connected_sockets.size() >= WSA_MAXIMUM_WAIT_EVENTS)
+                {
+                    WS_ERROR("Too many connections");
+                    closesocket(s);
+                    continue;
+                }
+
+                WSAEVENT e = WSACreateEvent();
+                if (e == WSA_INVALID_EVENT)
+                {
+                    WS_ERROR("WSACreateEvent failed with code:", WSAGetLastError());
+                    WSACloseEvent((HANDLE)e);
+                    closesocket(s);
+                    continue;
+                }
+
+                WSAEventSelect(s, e, FD_READ | FD_WRITE | FD_CLOSE);
+
+                socket_events.push_back(e);
+                connected_sockets.push_back(new SOCKET_INFO(s));
+            }
+
+            if (network_event.lNetworkEvents & FD_READ)
+            {
+                if (network_event.iErrorCode[FD_READ_BIT])
+                {
+                    WS_ERROR("FD_READ failed with code:", network_event.iErrorCode[FD_READ_BIT]);
+                    break;
+                }
+            }
+
+            if (network_event.lNetworkEvents & FD_WRITE)
+            {
+                if (network_event.iErrorCode[FD_WRITE_BIT])
+                {
+                    WS_ERROR("FD_WRITE failed with code:", network_event.iErrorCode[FD_WRITE_BIT]);
+                    break;
+                }
             }
 
             if (network_event.lNetworkEvents & FD_CLOSE)
             {
-                
-            }
+                WS_LOG("Close connection on socket:", connected_sockets[idx]->socket);
+                if (network_event.iErrorCode[FD_CLOSE_BIT])
+                {
+                    WS_ERROR("FD_CLOSE failed with code:", network_event.iErrorCode[FD_CLOSE_BIT]);
+                    continue;
+                }
 
-            if (network_event.lNetworkEvents & FD_READ || network_event.lNetworkEvents & FD_WRITE)
-            {
+                closesocket(connected_sockets[idx]->socket);
+                WSACloseEvent(socket_events[idx]);
 
+                connected_sockets[idx] = NULL;
+                for (int i = 0; i < connected_sockets.size(); )
+                {
+                    if (connected_sockets[i] == NULL)
+                    {
+                        connected_sockets.erase(connected_sockets.begin() + i);
+                        socket_events.erase(socket_events.begin() + i);
+                    }
+                    else
+                    {
+                        i++;
+                    }
+                }
             }
         }
     }
@@ -1403,31 +1463,31 @@ namespace ClientServer_EventSelectModel
                     return;
                 }
 
-                for (int i = 0; i < 10; i++)
-                {
-                    char buffer[1024];
-                    int buffer_len = 1024;
-                    memset(buffer, 0, buffer_len);
-                    strcpy(buffer, "request_data_from_client");
-                    rc = send(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
+                //for (int i = 0; i < 10; i++)
+                //{
+                //    char buffer[1024];
+                //    int buffer_len = 1024;
+                //    memset(buffer, 0, buffer_len);
+                //    strcpy(buffer, "request_data_from_client");
+                //    rc = send(soc_client, buffer, buffer_len, 0);
+                //    if (rc == SOCKET_ERROR)
+                //    {
+                //        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                //        break;
+                //    }
 
-                    memset(buffer, 0, buffer_len);
-                    rc = recv(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
+                //    memset(buffer, 0, buffer_len);
+                //    rc = recv(soc_client, buffer, buffer_len, 0);
+                //    if (rc == SOCKET_ERROR)
+                //    {
+                //        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                //        break;
+                //    }
 
-                    f_prompt("Received data from server: ");
-                    f_prompt(buffer);
-                    f_prompt("\n");
-                }
+                //    f_prompt("Received data from server: ");
+                //    f_prompt(buffer);
+                //    f_prompt("\n");
+                //}
 
                 closesocket(soc_client);
             }
