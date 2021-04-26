@@ -1352,20 +1352,9 @@ namespace ClientServer_EventSelectModel
 
                 closesocket(connected_sockets[idx]->socket);
                 WSACloseEvent(socket_events[idx]);
-
-                connected_sockets[idx] = NULL;
-                for (int i = 0; i < connected_sockets.size(); )
-                {
-                    if (connected_sockets[i] == NULL)
-                    {
-                        connected_sockets.erase(connected_sockets.begin() + i);
-                        socket_events.erase(socket_events.begin() + i);
-                    }
-                    else
-                    {
-                        i++;
-                    }
-                }
+                SAFE_DELETE(connected_sockets[idx]);
+                connected_sockets.erase(connected_sockets.begin() + idx);
+                socket_events.erase(socket_events.begin() + idx);
             }
         }
     }
