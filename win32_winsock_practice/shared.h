@@ -1630,15 +1630,6 @@ namespace ClientServer_OverlappedModel
             return;
         }
 
-        unsigned long io_non_block_mode = 1;
-        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
-        if (rc == SOCKET_ERROR)
-        {
-            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
-            closesocket(soc_listen);
-            return;
-        }
-
         rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
         if (rc)
         {
@@ -1751,31 +1742,31 @@ namespace ClientServer_OverlappedModel
                     return;
                 }
 
-                for (int i = 0; i < 10; i++)
-                {
-                    char buffer[1024];
-                    int buffer_len = 1024;
-                    memset(buffer, 0, buffer_len);
-                    strcpy(buffer, "request_data_from_client");
-                    rc = send(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
+                //for (int i = 0; i < 10; i++)
+                //{
+                //    char buffer[1024];
+                //    int buffer_len = 1024;
+                //    memset(buffer, 0, buffer_len);
+                //    strcpy(buffer, "request_data_from_client");
+                //    rc = send(soc_client, buffer, buffer_len, 0);
+                //    if (rc == SOCKET_ERROR)
+                //    {
+                //        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                //        break;
+                //    }
 
-                    memset(buffer, 0, buffer_len);
-                    rc = recv(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
+                //    memset(buffer, 0, buffer_len);
+                //    rc = recv(soc_client, buffer, buffer_len, 0);
+                //    if (rc == SOCKET_ERROR)
+                //    {
+                //        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                //        break;
+                //    }
 
-                    f_prompt("Received data from server: ");
-                    f_prompt(buffer);
-                    f_prompt("\n");
-                }
+                //    f_prompt("Received data from server: ");
+                //    f_prompt(buffer);
+                //    f_prompt("\n");
+                //}
 
                 closesocket(soc_client);
             }
@@ -1881,15 +1872,6 @@ namespace ClientServer_CompletionPortModel
             return;
         }
 
-        unsigned long io_non_block_mode = 1;
-        rc = ioctlsocket(soc_listen, FIONBIO, &io_non_block_mode);
-        if (rc == SOCKET_ERROR)
-        {
-            WS_ERROR("set non-block mode failed with code:", WSAGetLastError());
-            closesocket(soc_listen);
-            return;
-        }
-
         rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
         if (rc)
         {
@@ -2002,31 +1984,31 @@ namespace ClientServer_CompletionPortModel
                     return;
                 }
 
-                for (int i = 0; i < 10; i++)
-                {
-                    char buffer[1024];
-                    int buffer_len = 1024;
-                    memset(buffer, 0, buffer_len);
-                    strcpy(buffer, "request_data_from_client");
-                    rc = send(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
+                //for (int i = 0; i < 10; i++)
+                //{
+                //    char buffer[1024];
+                //    int buffer_len = 1024;
+                //    memset(buffer, 0, buffer_len);
+                //    strcpy(buffer, "request_data_from_client");
+                //    rc = send(soc_client, buffer, buffer_len, 0);
+                //    if (rc == SOCKET_ERROR)
+                //    {
+                //        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                //        break;
+                //    }
 
-                    memset(buffer, 0, buffer_len);
-                    rc = recv(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
+                //    memset(buffer, 0, buffer_len);
+                //    rc = recv(soc_client, buffer, buffer_len, 0);
+                //    if (rc == SOCKET_ERROR)
+                //    {
+                //        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                //        break;
+                //    }
 
-                    f_prompt("Received data from server: ");
-                    f_prompt(buffer);
-                    f_prompt("\n");
-                }
+                //    f_prompt("Received data from server: ");
+                //    f_prompt(buffer);
+                //    f_prompt("\n");
+                //}
 
                 closesocket(soc_client);
             }
