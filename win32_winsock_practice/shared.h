@@ -1353,7 +1353,10 @@ namespace ClientServer_EventSelectModel
                         rc = recv(soc_info->socket, soc_info->buffer, 1024, 0);
                         if (rc == SOCKET_ERROR)
                         {
-                            WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                            if (WSAGetLastError() != WSAEWOULDBLOCK)
+                            {
+                                WS_ERROR("send failed with code:", WSAGetLastError());
+                            }
                             continue;
                         }
 
