@@ -1596,18 +1596,24 @@ namespace ClientServer_OverlappedModel
         SOCKET socket;
         char buffer[1024];
         DWORD byte_recv;
+        WSABUF wsa_buffer;
+        WSAOVERLAPPED overlapped_structure;
 
         SOCKET_INFO(SOCKET s)
         {
             socket = s;
             byte_recv = 0;
             memset(buffer, 0, 1024);
+            wsa_buffer.buf = buffer;
+            wsa_buffer.len = 1024;
         }
 
         void ResetData()
         {
             memset(buffer, 0, 1024);
             byte_recv = 0;
+            wsa_buffer.buf = buffer;
+            wsa_buffer.len = 1024;
         }
     };
 
@@ -1623,10 +1629,10 @@ namespace ClientServer_OverlappedModel
         soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
         soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
 
-        SOCKET soc_listen = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        SOCKET soc_listen = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
         if (soc_listen == INVALID_SOCKET)
         {
-            WS_ERROR("socket failed with error code:", WSAGetLastError());
+            WS_ERROR("create socket failed with error code:", WSAGetLastError());
             return;
         }
 
@@ -1646,7 +1652,28 @@ namespace ClientServer_OverlappedModel
             return;
         }
 
+        SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+        if (soc_accept == INVALID_SOCKET)
+        {
+            WS_ERROR("create accept socket failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
+        std::vector<WSAEVENT> socket_events;
+        WSAEVENT network_event = WSACreateEvent();
+        if (network_event == WSA_INVALID_EVENT)
+        {
+            WS_ERROR("WSACreateEvent failed with code:", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+        socket_events.push_back(network_event);
         
+        while (true)
+        {
+
+        }
     }
 
     void UDP_Server()
