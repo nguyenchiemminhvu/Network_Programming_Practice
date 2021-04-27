@@ -521,7 +521,7 @@ namespace ClientServer_SelectModel
                     rc = recv(socket_info->socket, socket_info->buffer, 1024, 0);
                     if (rc == SOCKET_ERROR)
                     {
-                        if (WSAGetLastError() == WSAEWOULDBLOCK)
+                        if (WSAGetLastError() != WSAEWOULDBLOCK)
                         {
                             WS_ERROR("recv failed with code:", WSAGetLastError());
                             SAFE_DELETE(connected_sockets[i]);
@@ -544,7 +544,7 @@ namespace ClientServer_SelectModel
                     rc = send(socket_info->socket, socket_info->buffer, 1024, 0);
                     if (rc == SOCKET_ERROR)
                     {
-                        if (WSAGetLastError() == WSAEWOULDBLOCK)
+                        if (WSAGetLastError() != WSAEWOULDBLOCK)
                         {
                             WS_ERROR("send failed with code:", WSAGetLastError());
                             SAFE_DELETE(connected_sockets[i]);
@@ -1356,6 +1356,11 @@ namespace ClientServer_EventSelectModel
                             if (WSAGetLastError() != WSAEWOULDBLOCK)
                             {
                                 WS_ERROR("send failed with code:", WSAGetLastError());
+                                closesocket(connected_sockets[idx]->socket);
+                                WSACloseEvent(socket_events[idx]);
+                                SAFE_DELETE(connected_sockets[idx]);
+                                connected_sockets.erase(connected_sockets.begin() + idx);
+                                socket_events.erase(socket_events.begin() + idx);
                             }
                             continue;
                         }
@@ -1368,7 +1373,15 @@ namespace ClientServer_EventSelectModel
                         rc = send(soc_info->socket, soc_info->buffer, 1024, 0);
                         if (rc == SOCKET_ERROR)
                         {
-                            WS_ERROR("send failed with code:", WSAGetLastError());
+                            if (WSAGetLastError() != WSAEWOULDBLOCK)
+                            {
+                                WS_ERROR("send failed with code:", WSAGetLastError());
+                                closesocket(connected_sockets[idx]->socket);
+                                WSACloseEvent(socket_events[idx]);
+                                SAFE_DELETE(connected_sockets[idx]);
+                                connected_sockets.erase(connected_sockets.begin() + idx);
+                                socket_events.erase(socket_events.begin() + idx);
+                            }
                             continue;
                         }
 
@@ -1383,7 +1396,6 @@ namespace ClientServer_EventSelectModel
                 if (network_event.iErrorCode[FD_CLOSE_BIT])
                 {
                     WS_ERROR("FD_CLOSE failed with code:", network_event.iErrorCode[FD_CLOSE_BIT]);
-                    continue;
                 }
 
                 closesocket(connected_sockets[idx]->socket);
@@ -1391,20 +1403,6 @@ namespace ClientServer_EventSelectModel
                 SAFE_DELETE(connected_sockets[idx]);
                 connected_sockets.erase(connected_sockets.begin() + idx);
                 socket_events.erase(socket_events.begin() + idx);
-            }
-
-            for (int i = 0; i < connected_sockets.size(); )
-            {
-                if (connected_sockets[i] == NULL)
-                {
-                    connected_sockets.erase(connected_sockets.begin() + i);
-                    WSACloseEvent(socket_events[i]);
-                    socket_events.erase(socket_events.begin() + i);
-                }
-                else
-                {
-                    i++;
-                }
             }
         }
     }
