@@ -1617,6 +1617,25 @@ namespace ClientServer_OverlappedModel
         }
     };
 
+    std::vector<SOCKET_INFO*> connected_sockets;
+    std::vector<WSAEVENT> socket_events;
+
+    CRITICAL_SECTION critical_locker;
+
+    unsigned int __stdcall Overlapped_IO_Proc(void* arg)
+    {
+        while (true)
+        {
+
+
+            EnterCriticalSection(&critical_locker);
+
+            LeaveCriticalSection(&critical_locker);
+        }
+
+        return 0;
+    }
+
     void TCP_Server()
     {
         int rc;
@@ -1660,7 +1679,6 @@ namespace ClientServer_OverlappedModel
             return;
         }
 
-        std::vector<WSAEVENT> socket_events;
         WSAEVENT network_event = WSACreateEvent();
         if (network_event == WSA_INVALID_EVENT)
         {
@@ -1669,10 +1687,24 @@ namespace ClientServer_OverlappedModel
             return;
         }
         socket_events.push_back(network_event);
-        
+
+        InitializeCriticalSection(&critical_locker);
+        HANDLE io_proc = (HANDLE)_beginthreadex(NULL, 0, &Overlapped_IO_Proc, NULL, 0, NULL);
+        if (!io_proc)
+        {
+            WS_ERROR("Create Overlapped IO thread failed with code:", GetLastError());
+            closesocket(soc_listen);
+            WSACloseEvent(network_event);
+            return;
+        }
+
         while (true)
         {
 
+
+            EnterCriticalSection(&critical_locker);
+
+            LeaveCriticalSection(&critical_locker);
         }
     }
 
