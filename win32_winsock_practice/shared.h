@@ -1599,13 +1599,19 @@ namespace ClientServer_OverlappedModel
         WSABUF wsa_buffer;
         WSAOVERLAPPED overlapped_structure;
 
-        SOCKET_INFO(SOCKET s)
+        SOCKET_INFO(SOCKET s, WSAEVENT e = NULL)
         {
             socket = s;
             byte_recv = 0;
             memset(buffer, 0, 1024);
             wsa_buffer.buf = buffer;
             wsa_buffer.len = 1024;
+            
+            SecureZeroMemory(&overlapped_structure, sizeof(WSAOVERLAPPED));
+            if (e != WSA_INVALID_EVENT)
+            {
+                overlapped_structure.hEvent = e;
+            }
         }
 
         void ResetData()
@@ -1624,9 +1630,22 @@ namespace ClientServer_OverlappedModel
 
     unsigned int __stdcall Overlapped_IO_Proc(void* arg)
     {
+        int rc;
+
         while (true)
         {
+            rc = WSAWaitForMultipleEvents(socket_events.size(), &socket_events[0], FALSE, INFINITE, FALSE);
+            if (rc == WSA_WAIT_FAILED)
+            {
+                WS_ERROR("Waiting for multiple events failed with code:", WSAGetLastError());
+                return 1;
+            }
 
+            if ((rc - WSA_WAIT_EVENT_0) == 0) // just a connection attempt was made
+            {
+                WSAResetEvent(socket_events[0]);
+                continue;
+            }
 
             EnterCriticalSection(&critical_locker);
 
@@ -1700,11 +1719,56 @@ namespace ClientServer_OverlappedModel
 
         while (true)
         {
-
+            soc_accept = accept(soc_listen, NULL, NULL);
+            if (soc_accept == INVALID_SOCKET)
+            {
+                WS_ERROR("accept failed with code:", WSAGetLastError());
+                closesocket(soc_listen);
+                WSACloseEvent(network_event);
+                return;
+            }
 
             EnterCriticalSection(&critical_locker);
 
+            WSAEVENT soc_accept_event = WSACreateEvent();
+            if (soc_accept_event == WSA_INVALID_EVENT)
+            {
+                closesocket(soc_accept);
+                continue;
+            }
+            socket_events.push_back(soc_accept_event);
+            connected_sockets.push_back(new SOCKET_INFO(soc_accept, soc_accept_event));
+
+            DWORD flags = 0;
+            rc = WSARecv(
+                connected_sockets.back()->socket, 
+                &connected_sockets.back()->wsa_buffer, 
+                1, 
+                &connected_sockets.back()->byte_recv, 
+                &flags, 
+                &connected_sockets.back()->overlapped_structure, 
+                NULL
+            );
+            if (rc == SOCKET_ERROR)
+            {
+                if (WSAGetLastError() != WSA_IO_PENDING)
+                {
+                    WS_ERROR("WSARecv failed with code:", WSAGetLastError());
+                    
+                    WSACloseEvent(socket_events.back());
+                    socket_events.erase(socket_events.end() - 1);
+
+                    closesocket(connected_sockets.back()->socket);
+                    SAFE_DELETE(connected_sockets.back());
+                    connected_sockets.erase(connected_sockets.end() - 1);
+                    
+                    continue;
+                }
+            }
+
             LeaveCriticalSection(&critical_locker);
+
+            WSASetEvent(socket_events[0]);
         }
     }
 
@@ -1786,7 +1850,7 @@ namespace ClientServer_OverlappedModel
 
                 int server_info_len = sizeof(server_info);
 
-                SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+                SOCKET soc_client = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
                 if (soc_client == INVALID_SOCKET)
                 {
                     WS_ERROR("create socket client failed with code:", WSAGetLastError(), CLIENT);
@@ -1801,31 +1865,31 @@ namespace ClientServer_OverlappedModel
                     return;
                 }
 
-                //for (int i = 0; i < 10; i++)
-                //{
-                //    char buffer[1024];
-                //    int buffer_len = 1024;
-                //    memset(buffer, 0, buffer_len);
-                //    strcpy(buffer, "request_data_from_client");
-                //    rc = send(soc_client, buffer, buffer_len, 0);
-                //    if (rc == SOCKET_ERROR)
-                //    {
-                //        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
-                //        break;
-                //    }
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
 
-                //    memset(buffer, 0, buffer_len);
-                //    rc = recv(soc_client, buffer, buffer_len, 0);
-                //    if (rc == SOCKET_ERROR)
-                //    {
-                //        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                //        break;
-                //    }
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
 
-                //    f_prompt("Received data from server: ");
-                //    f_prompt(buffer);
-                //    f_prompt("\n");
-                //}
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+                }
 
                 closesocket(soc_client);
             }
