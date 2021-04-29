@@ -1668,7 +1668,15 @@ namespace ClientServer_OverlappedModel
 
             if (!rc || byte_transferred == 0)
             {
-                WS_ERROR("Get Overlapped result failed with code:", WSAGetLastError());
+                if (!rc)
+                {
+                    WS_ERROR("Get Overlapped result failed with code:", WSAGetLastError());
+                }
+                else if (byte_transferred == 0)
+                {
+                    WS_LOG("Close connection on socket:", soc_client_info->socket);
+                }
+
                 WSACloseEvent(socket_events[idx]);
                 closesocket(connected_sockets[idx]->socket);
 
@@ -1724,10 +1732,8 @@ namespace ClientServer_OverlappedModel
 
                 soc_client_info->ResetData();
             }
-
             if (soc_client_info->byte_recv == 0)
             {
-                soc_client_info->ResetData();
                 SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
                 soc_client_info->overlapped_structure.hEvent = socket_events[idx];
 
@@ -1834,12 +1840,8 @@ namespace ClientServer_OverlappedModel
             if (soc_accept == INVALID_SOCKET)
             {
                 WS_ERROR("accept failed with code:", WSAGetLastError());
-                closesocket(soc_listen);
-                WSACloseEvent(soc_listen_event);
-                return;
+                continue;
             }
-
-            EnterCriticalSection(&critical_locker);
 
             WSAEVENT soc_accept_event = WSACreateEvent();
             if (soc_accept_event == WSA_INVALID_EVENT)
@@ -1847,6 +1849,9 @@ namespace ClientServer_OverlappedModel
                 closesocket(soc_accept);
                 continue;
             }
+
+            EnterCriticalSection(&critical_locker);
+
             socket_events.push_back(soc_accept_event);
             connected_sockets.push_back(new SOCKET_INFO(soc_accept, soc_accept_event));
 
