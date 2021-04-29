@@ -1808,15 +1808,15 @@ namespace ClientServer_OverlappedModel
             return;
         }
 
-        WSAEVENT network_event = WSACreateEvent();
-        if (network_event == WSA_INVALID_EVENT)
+        WSAEVENT soc_listen_event = WSACreateEvent();
+        if (soc_listen_event == WSA_INVALID_EVENT)
         {
             WS_ERROR("WSACreateEvent failed with code:", WSAGetLastError());
             closesocket(soc_listen);
             return;
         }
-        socket_events.push_back(network_event);
-        connected_sockets.push_back(new SOCKET_INFO(soc_listen, network_event));
+        socket_events.push_back(soc_listen_event);
+        connected_sockets.push_back(new SOCKET_INFO(soc_listen, soc_listen_event));
 
         InitializeCriticalSection(&critical_locker);
         HANDLE io_proc = (HANDLE)_beginthreadex(NULL, 0, &Overlapped_IO_Proc, NULL, 0, NULL);
@@ -1824,7 +1824,7 @@ namespace ClientServer_OverlappedModel
         {
             WS_ERROR("Create Overlapped IO thread failed with code:", GetLastError());
             closesocket(soc_listen);
-            WSACloseEvent(network_event);
+            WSACloseEvent(soc_listen_event);
             return;
         }
 
@@ -1835,7 +1835,7 @@ namespace ClientServer_OverlappedModel
             {
                 WS_ERROR("accept failed with code:", WSAGetLastError());
                 closesocket(soc_listen);
-                WSACloseEvent(network_event);
+                WSACloseEvent(soc_listen_event);
                 return;
             }
 
