@@ -1647,9 +1647,119 @@ namespace ClientServer_OverlappedModel
                 continue;
             }
 
-            EnterCriticalSection(&critical_locker);
+            int idx = rc - WSA_WAIT_EVENT_0;
+            SOCKET_INFO* soc_client_info = connected_sockets[idx];
+            if (!soc_client_info)
+            {
+                continue;
+            }
 
-            LeaveCriticalSection(&critical_locker);
+            WSAResetEvent(socket_events[idx]);
+
+            DWORD flags = 0;
+            DWORD byte_transferred = 0;
+            rc = (int)WSAGetOverlappedResult(
+                soc_client_info->socket,
+                &soc_client_info->overlapped_structure,
+                &byte_transferred,
+                FALSE,
+                &flags
+            );
+
+            if (!rc || byte_transferred == 0)
+            {
+                WS_ERROR("Get Overlapped result failed with code:", WSAGetLastError());
+                WSACloseEvent(socket_events[idx]);
+                closesocket(connected_sockets[idx]->socket);
+
+                EnterCriticalSection(&critical_locker);
+                
+                SAFE_DELETE(connected_sockets[idx]);
+                socket_events.erase(socket_events.begin() + idx);
+                connected_sockets.erase(connected_sockets.begin() + idx);
+
+                LeaveCriticalSection(&critical_locker);
+
+                continue;
+            }
+
+            if (soc_client_info->byte_recv == 0)
+            {
+                soc_client_info->byte_recv = byte_transferred;
+            }
+
+            if (soc_client_info->byte_recv > 0)
+            {
+                SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
+                soc_client_info->overlapped_structure.hEvent = socket_events[idx];
+
+                rc = WSASend(
+                    soc_client_info->socket,
+                    &soc_client_info->wsa_buffer,
+                    1,
+                    &soc_client_info->byte_recv,
+                    0,
+                    &soc_client_info->overlapped_structure,
+                    NULL
+                );
+                if (rc == SOCKET_ERROR)
+                {
+                    if (WSAGetLastError() != WSA_IO_PENDING)
+                    {
+                        WS_ERROR("Get Overlapped result failed with code:", WSAGetLastError());
+                        WSACloseEvent(socket_events[idx]);
+                        closesocket(connected_sockets[idx]->socket);
+
+                        EnterCriticalSection(&critical_locker);
+
+                        SAFE_DELETE(connected_sockets[idx]);
+                        socket_events.erase(socket_events.begin() + idx);
+                        connected_sockets.erase(connected_sockets.begin() + idx);
+
+                        LeaveCriticalSection(&critical_locker);
+
+                        continue;
+                    }
+                }
+
+                soc_client_info->ResetData();
+            }
+
+            if (soc_client_info->byte_recv == 0)
+            {
+                soc_client_info->ResetData();
+                SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
+                soc_client_info->overlapped_structure.hEvent = socket_events[idx];
+
+                rc = WSARecv(
+                    soc_client_info->socket,
+                    &soc_client_info->wsa_buffer,
+                    1, 
+                    &soc_client_info->byte_recv,
+                    &flags,
+                    &soc_client_info->overlapped_structure,
+                    NULL
+                );
+                if (rc == SOCKET_ERROR)
+                {
+                    if (WSAGetLastError() != WSA_IO_PENDING)
+                    {
+                        WS_ERROR("Get Overlapped result failed with code:", WSAGetLastError());
+                        WSACloseEvent(socket_events[idx]);
+                        closesocket(connected_sockets[idx]->socket);
+
+                        EnterCriticalSection(&critical_locker);
+
+                        SAFE_DELETE(connected_sockets[idx]);
+                        socket_events.erase(socket_events.begin() + idx);
+                        connected_sockets.erase(connected_sockets.begin() + idx);
+
+                        LeaveCriticalSection(&critical_locker);
+
+                        continue;
+                    }
+                }
+            }
         }
 
         return 0;
@@ -1706,6 +1816,7 @@ namespace ClientServer_OverlappedModel
             return;
         }
         socket_events.push_back(network_event);
+        connected_sockets.push_back(new SOCKET_INFO(soc_listen, network_event));
 
         InitializeCriticalSection(&critical_locker);
         HANDLE io_proc = (HANDLE)_beginthreadex(NULL, 0, &Overlapped_IO_Proc, NULL, 0, NULL);
@@ -1871,6 +1982,10 @@ namespace ClientServer_OverlappedModel
                     int buffer_len = 1024;
                     memset(buffer, 0, buffer_len);
                     strcpy(buffer, "request_data_from_client");
+                    int cur_len = strlen(buffer);
+                    buffer[cur_len] = '_';
+                    buffer[cur_len + 1] = i + '0';
+
                     rc = send(soc_client, buffer, buffer_len, 0);
                     if (rc == SOCKET_ERROR)
                     {
