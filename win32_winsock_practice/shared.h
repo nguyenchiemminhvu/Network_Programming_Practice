@@ -2110,6 +2110,33 @@ namespace ClientServer_CompletionRoutineModel
 
     unsigned int __stdcall CompletionRoutineProc(void* arg)
     {
+        int rc = 0;
+
+        std::vector<WSAEVENT> events;
+        WSAEVENT* network_event = (WSAEVENT*)arg;
+        events.push_back(*network_event);
+
+        while (true)
+        {
+            while (true)
+            {
+                rc = WSAWaitForMultipleEvents(1, events.data(), FALSE, INFINITE, TRUE);
+                if (rc == WSA_WAIT_FAILED)
+                {
+                    WS_ERROR("wait multiple events failed with code:", WSAGetLastError());
+                    return 1;
+                }
+
+                if (rc != WAIT_IO_COMPLETION)
+                {
+                    break;
+                }
+            }
+
+            WSAResetEvent(events[rc - WSA_WAIT_EVENT_0]);
+
+        }
+        
         return 0;
     }
 
@@ -2153,11 +2180,28 @@ namespace ClientServer_CompletionRoutineModel
             return;
         }
 
+        WSAEVENT network_event = WSACreateEvent();
+        if (network_event == WSA_INVALID_EVENT)
+        {
+            WS_ERROR("create network event failed w", WSAGetLastError());
+            closesocket(soc_listen);
+            return;
+        }
+
         SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
         if (soc_accept == INVALID_SOCKET)
         {
             WS_ERROR("create accept socket failed with code:", WSAGetLastError());
             closesocket(soc_listen);
+            return;
+        }
+
+        HANDLE routine = (HANDLE)_beginthreadex(NULL, 0, CompletionRoutineProc, (void*)&network_event, 0, NULL);
+        if (!routine)
+        {
+            WS_ERROR("Create completion routine thread failed with code:", GetLastError());
+            closesocket(soc_listen);
+            WSACloseEvent(network_event);
             return;
         }
 
@@ -2169,8 +2213,6 @@ namespace ClientServer_CompletionRoutineModel
                 WS_ERROR("accept failed with code:", WSAGetLastError());
                 continue;
             }
-
-            
         }
     }
 
