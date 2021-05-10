@@ -2171,7 +2171,12 @@ namespace ClientServer_CompletionRoutineModel
                 if (WSAGetLastError() != WSA_IO_PENDING)
                 {
                     WS_ERROR("WSARecv failed with code:", WSAGetLastError());
-                    return 1;
+                    closesocket(soc_client_info->socket);
+                    soc_client_info = NULL;
+                    connected_sockets[idx] = NULL;
+                    connected_sockets.erase(connected_sockets.begin() + idx);
+                    socket_events.erase(socket_events.begin() + idx);
+                    continue;
                 }
             }
         }
@@ -2365,35 +2370,35 @@ namespace ClientServer_CompletionRoutineModel
                     return;
                 }
 
-                //for (int i = 0; i < 10; i++)
-                //{
-                //    char buffer[1024];
-                //    int buffer_len = 1024;
-                //    memset(buffer, 0, buffer_len);
-                //    strcpy(buffer, "request_data_from_client");
-                //    int cur_len = strlen(buffer);
-                //    buffer[cur_len] = '_';
-                //    buffer[cur_len + 1] = i + '0';
+                for (int i = 0; i < 10; i++)
+                {
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    int cur_len = strlen(buffer);
+                    buffer[cur_len] = '_';
+                    buffer[cur_len + 1] = i + '0';
 
-                //    rc = send(soc_client, buffer, buffer_len, 0);
-                //    if (rc == SOCKET_ERROR)
-                //    {
-                //        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
-                //        break;
-                //    }
+                    rc = send(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
 
-                //    memset(buffer, 0, buffer_len);
-                //    rc = recv(soc_client, buffer, buffer_len, 0);
-                //    if (rc == SOCKET_ERROR)
-                //    {
-                //        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                //        break;
-                //    }
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
 
-                //    f_prompt("Received data from server: ");
-                //    f_prompt(buffer);
-                //    f_prompt("\n");
-                //}
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
+                }
 
                 closesocket(soc_client);
             }
