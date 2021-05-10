@@ -2078,11 +2078,11 @@ namespace ClientServer_CompletionRoutineModel
     class SOCKET_INFO
     {
     public:
+        WSAOVERLAPPED overlapped_structure;
         SOCKET socket;
         char buffer[1024];
         DWORD byte_recv;
         WSABUF wsa_buffer;
-        WSAOVERLAPPED overlapped_structure;
 
         SOCKET_INFO(SOCKET s, WSAEVENT e = NULL)
         {
@@ -2115,7 +2115,131 @@ namespace ClientServer_CompletionRoutineModel
 
     void __stdcall CompletionRoutineInternal(DWORD dwError, DWORD cbTransferred, LPWSAOVERLAPPED lpOverlapped, DWORD dwFlags)
     {
+        int rc;
+        DWORD flags;
 
+        SOCKET_INFO* soc_client_info = (SOCKET_INFO*)lpOverlapped;
+        if (!soc_client_info)
+            return;
+
+        if (cbTransferred == 0)
+        {
+            WS_LOG("Close connection on socket:", soc_client_info->socket);
+        }
+        
+        if (dwError || cbTransferred == 0)
+        {
+            int i;
+            for (i = 0; i < connected_sockets.size(); i++)
+            {
+                if (soc_client_info->socket == connected_sockets[i]->socket)
+                {
+                    break;
+                }
+            }
+            if (i < connected_sockets.size())
+            {
+                closesocket(connected_sockets[i]->socket);
+                WSACloseEvent(socket_events[i]);
+                connected_sockets[i] = NULL;
+                EnterCriticalSection(&critical_locker);
+                connected_sockets.erase(connected_sockets.begin() + i);
+                socket_events.erase(socket_events.begin() + i);
+                LeaveCriticalSection(&critical_locker);
+            }
+            
+            return;
+        }
+
+        if (soc_client_info->byte_recv == 0)
+        {
+            soc_client_info->byte_recv = cbTransferred;
+        }
+
+        if (soc_client_info->byte_recv)
+        {
+            SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
+            rc = WSASend(
+                soc_client_info->socket,
+                &soc_client_info->wsa_buffer,
+                1,
+                &soc_client_info->byte_recv,
+                0,
+                &soc_client_info->overlapped_structure,
+                CompletionRoutineInternal
+            );
+            if (rc == SOCKET_ERROR)
+            {
+                if (WSAGetLastError() != WSA_IO_PENDING)
+                {
+                    WS_ERROR("WSASend failed with code:", WSAGetLastError());
+                    int i;
+                    for (i = 0; i < connected_sockets.size(); i++)
+                    {
+                        if (soc_client_info->socket == connected_sockets[i]->socket)
+                        {
+                            break;
+                        }
+                    }
+                    if (i < connected_sockets.size())
+                    {
+                        closesocket(connected_sockets[i]->socket);
+                        WSACloseEvent(socket_events[i]);
+                        connected_sockets[i] = NULL;
+                        EnterCriticalSection(&critical_locker);
+                        connected_sockets.erase(connected_sockets.begin() + i);
+                        socket_events.erase(socket_events.begin() + i);
+                        LeaveCriticalSection(&critical_locker);
+                    }
+
+                    return;
+                }
+            }
+
+            soc_client_info->ResetData();
+        }
+
+        if (soc_client_info->byte_recv == 0)
+        {
+            flags = 0;
+            SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
+            rc = WSARecv(
+                soc_client_info->socket,
+                &soc_client_info->wsa_buffer,
+                1,
+                &cbTransferred,
+                &flags,
+                &soc_client_info->overlapped_structure,
+                CompletionRoutineInternal
+            );
+            if (rc == SOCKET_ERROR)
+            {
+                if (WSAGetLastError() != WSA_IO_PENDING)
+                {
+                    WS_ERROR("WSARecv failed with code:", WSAGetLastError());
+                    int i;
+                    for (i = 0; i < connected_sockets.size(); i++)
+                    {
+                        if (soc_client_info->socket == connected_sockets[i]->socket)
+                        {
+                            break;
+                        }
+                    }
+                    if (i < connected_sockets.size())
+                    {
+                        closesocket(connected_sockets[i]->socket);
+                        WSACloseEvent(socket_events[i]);
+                        connected_sockets[i] = NULL;
+                        EnterCriticalSection(&critical_locker);
+                        connected_sockets.erase(connected_sockets.begin() + i);
+                        socket_events.erase(socket_events.begin() + i);
+                        LeaveCriticalSection(&critical_locker);
+                    }
+
+                    return;
+                }
+            }
+        }
     }
 
     unsigned int __stdcall CompletionRoutineProc(void* arg)
@@ -2175,6 +2299,7 @@ namespace ClientServer_CompletionRoutineModel
                     soc_client_info = NULL;
                     connected_sockets[idx] = NULL;
                     connected_sockets.erase(connected_sockets.begin() + idx);
+                    WSACloseEvent(socket_events[idx]);
                     socket_events.erase(socket_events.begin() + idx);
                     continue;
                 }
