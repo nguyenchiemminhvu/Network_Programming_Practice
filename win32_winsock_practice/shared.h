@@ -2166,31 +2166,13 @@ namespace ClientServer_CompletionRoutineModel
                 &soc_client_info->byte_recv,
                 0,
                 &soc_client_info->overlapped_structure,
-                CompletionRoutineInternal
+                NULL
             );
             if (rc == SOCKET_ERROR)
             {
                 if (WSAGetLastError() != WSA_IO_PENDING)
                 {
                     WS_ERROR("WSASend failed with code:", WSAGetLastError());
-                    int i;
-                    for (i = 0; i < connected_sockets.size(); i++)
-                    {
-                        if (soc_client_info->socket == connected_sockets[i]->socket)
-                        {
-                            break;
-                        }
-                    }
-                    if (i < connected_sockets.size())
-                    {
-                        closesocket(connected_sockets[i]->socket);
-                        WSACloseEvent(socket_events[i]);
-                        connected_sockets[i] = NULL;
-                        EnterCriticalSection(&critical_locker);
-                        connected_sockets.erase(connected_sockets.begin() + i);
-                        socket_events.erase(socket_events.begin() + i);
-                        LeaveCriticalSection(&critical_locker);
-                    }
 
                     return;
                 }
@@ -2217,24 +2199,6 @@ namespace ClientServer_CompletionRoutineModel
                 if (WSAGetLastError() != WSA_IO_PENDING)
                 {
                     WS_ERROR("WSARecv failed with code:", WSAGetLastError());
-                    int i;
-                    for (i = 0; i < connected_sockets.size(); i++)
-                    {
-                        if (soc_client_info->socket == connected_sockets[i]->socket)
-                        {
-                            break;
-                        }
-                    }
-                    if (i < connected_sockets.size())
-                    {
-                        closesocket(connected_sockets[i]->socket);
-                        WSACloseEvent(socket_events[i]);
-                        connected_sockets[i] = NULL;
-                        EnterCriticalSection(&critical_locker);
-                        connected_sockets.erase(connected_sockets.begin() + i);
-                        socket_events.erase(socket_events.begin() + i);
-                        LeaveCriticalSection(&critical_locker);
-                    }
 
                     return;
                 }
@@ -2297,10 +2261,14 @@ namespace ClientServer_CompletionRoutineModel
                     WS_ERROR("WSARecv failed with code:", WSAGetLastError());
                     closesocket(soc_client_info->socket);
                     soc_client_info = NULL;
-                    connected_sockets[idx] = NULL;
-                    connected_sockets.erase(connected_sockets.begin() + idx);
                     WSACloseEvent(socket_events[idx]);
+                    connected_sockets[idx] = NULL;
+
+                    EnterCriticalSection(&critical_locker);
+                    connected_sockets.erase(connected_sockets.begin() + idx);
                     socket_events.erase(socket_events.begin() + idx);
+                    LeaveCriticalSection(&critical_locker);
+
                     continue;
                 }
             }
