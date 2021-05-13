@@ -13,14 +13,14 @@ int main()
 
     std::promise<std::string> p_server_ip;
     std::future<std::string> f_server_ip = p_server_ip.get_future();
-    std::thread udp_client(ClientServer_CompletionRoutineModel::UDP_Client, std::ref(p_server_ip));
+    std::thread udp_client(ClientServer_IOCP_Model::UDP_Client, std::ref(p_server_ip));
     std::string s_server_ip = f_server_ip.get();
     if (udp_client.joinable())
     {
         udp_client.join();
     }
     
-    std::thread tcp_client(ClientServer_CompletionRoutineModel::TCP_Client, s_server_ip);
+    std::thread tcp_client(ClientServer_IOCP_Model::TCP_Client, s_server_ip);
     if (tcp_client.joinable())
     {
         tcp_client.join();
