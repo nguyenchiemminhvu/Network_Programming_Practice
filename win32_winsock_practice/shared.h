@@ -10,6 +10,7 @@
 #include <winsock2.h> // always include winsock2.h before windows.h
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
+#include <ioapiset.h>
 
 #include <thread>
 #include <mutex>
