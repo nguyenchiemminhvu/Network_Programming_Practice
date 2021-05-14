@@ -2563,6 +2563,7 @@ namespace ClientServer_IOCP_Model
     public:
         WSAOVERLAPPED overlapped_structure;
         SOCKET socket;
+        SOCKADDR_STORAGE client_info;
         char buffer[1024];
         DWORD byte_recv;
         WSABUF wsa_buffer;
@@ -2643,14 +2644,19 @@ namespace ClientServer_IOCP_Model
 
         while (true)
         {
-            SOCKET soc_accept = WSAAccept(soc_listen, NULL, NULL, NULL, NULL);
+            sockaddr_in client_info;
+            int client_info_len;
+            SOCKET soc_accept = WSAAccept(soc_listen, (SOCKADDR*)&client_info, &client_info_len, NULL, NULL);
             if (soc_accept == INVALID_SOCKET)
             {
                 WS_ERROR("accept failed with code:", WSAGetLastError());
                 continue;
             }
-
             
+            SOCKET_INFO* soc_client_info = new SOCKET_INFO(soc_accept);
+            memcpy(&soc_client_info->client_info, &client_info, client_info_len);
+
+
         }
     }
 
