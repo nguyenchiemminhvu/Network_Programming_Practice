@@ -2591,9 +2591,24 @@ namespace ClientServer_IOCP_Model
         }
     };
 
+    DWORD __stdcall IOCP_Proc(void *arg)
+    {
+        return 0;
+    }
+
     void TCP_Server()
     {
         int rc;
+
+        HANDLE IOCP_object = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+        if (IOCP_object == INVALID_HANDLE_VALUE)
+        {
+            WS_ERROR("Create IOCP object failed with code:", GetLastError());
+            return;
+        }
+        
+        SYSTEM_INFO sys_info;
+        GetSystemInfo(&sys_info);
 
         hostent* he = gethostbyname("");
         char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
@@ -2609,7 +2624,7 @@ namespace ClientServer_IOCP_Model
             WS_ERROR("socket failed with error code:", WSAGetLastError());
             return;
         }
-
+        
         rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
         if (rc)
         {
