@@ -2610,10 +2610,29 @@ namespace ClientServer_IOCP_Model
 
     DWORD __stdcall IOCP_Proc(void *arg)
     {
+        int rc;
+
         HANDLE IOCP_object = (HANDLE)arg;
+
+        SOCKET_WRAPPER *soc_client_wrapper = NULL;
+        SOCKET_INFO* soc_client_info = NULL;
+        DWORD byte_transferred;
 
         while (true)
         {
+            rc = (int)GetQueuedCompletionStatus(
+                IOCP_object, 
+                &byte_transferred, 
+                (DWORD*)&soc_client_wrapper, 
+                (LPOVERLAPPED*)soc_client_info, 
+                INFINITE
+            );
+            if (rc == 0)
+            {
+                WS_ERROR("GetQueuedCompletionStatus failed with code:", WSAGetLastError());
+                return 0;
+            }
+
 
         }
 
@@ -2679,7 +2698,14 @@ namespace ClientServer_IOCP_Model
 
         while (true)
         {
-            SOCKET soc_accept = WSAAccept(soc_listen, NULL, NULL, NULL, NULL);
+            SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+            if (soc_accept == INVALID_SOCKET)
+            {
+                WS_ERROR("WSASocket failed with code:", WSAGetLastError());
+                continue;
+            }
+
+            soc_accept = WSAAccept(soc_listen, NULL, NULL, NULL, 0);
             if (soc_accept == INVALID_SOCKET)
             {
                 WS_ERROR("accept failed with code:", WSAGetLastError());
