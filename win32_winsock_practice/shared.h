@@ -2592,8 +2592,31 @@ namespace ClientServer_IOCP_Model
         }
     };
 
+    class SOCKET_WRAPPER
+    {
+    public:
+        SOCKET socket;
+
+        SOCKET_WRAPPER(SOCKET s)
+        {
+            socket = s;
+        }
+
+        ~SOCKET_WRAPPER()
+        {
+
+        }
+    };
+
     DWORD __stdcall IOCP_Proc(void *arg)
     {
+        HANDLE IOCP_object = (HANDLE)arg;
+
+        while (true)
+        {
+
+        }
+
         return 0;
     }
 
@@ -2610,6 +2633,18 @@ namespace ClientServer_IOCP_Model
         
         SYSTEM_INFO sys_info;
         GetSystemInfo(&sys_info);
+
+        for (int i = 0; i < sys_info.dwNumberOfProcessors; i++)
+        {
+            DWORD worker_id;
+            HANDLE worker = CreateThread(NULL, 0, IOCP_Proc, IOCP_object, 0, &worker_id);
+            if (worker == NULL)
+            {
+                WS_ERROR("CreateThread failed with code:", GetLastError());
+                return;
+            }
+            CloseHandle(worker);
+        }
 
         hostent* he = gethostbyname("");
         char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
@@ -2644,19 +2679,46 @@ namespace ClientServer_IOCP_Model
 
         while (true)
         {
-            sockaddr_in client_info;
-            int client_info_len;
-            SOCKET soc_accept = WSAAccept(soc_listen, (SOCKADDR*)&client_info, &client_info_len, NULL, NULL);
+            SOCKET soc_accept = WSAAccept(soc_listen, NULL, NULL, NULL, NULL);
             if (soc_accept == INVALID_SOCKET)
             {
                 WS_ERROR("accept failed with code:", WSAGetLastError());
                 continue;
             }
-            
+
+            SOCKET_WRAPPER* soc_client = new SOCKET_WRAPPER(soc_accept);
+
+            if (CreateIoCompletionPort((HANDLE)soc_accept, IOCP_object, (DWORD)soc_client, 0) == NULL)
+            {
+                closesocket(soc_accept);
+                SAFE_DELETE(soc_client);
+                continue;
+            }
+
             SOCKET_INFO* soc_client_info = new SOCKET_INFO(soc_accept);
-            memcpy(&soc_client_info->client_info, &client_info, client_info_len);
-
-
+            
+            DWORD flags = 0;
+            DWORD byte_transferred = 0;
+            rc = WSARecv(
+                soc_accept, 
+                &soc_client_info->wsa_buffer, 
+                1, 
+                &byte_transferred, 
+                &flags, 
+                &soc_client_info->overlapped_structure, 
+                NULL
+            );
+            if (rc == SOCKET_ERROR)
+            {
+                if (WSAGetLastError() != WSA_IO_PENDING)
+                {
+                    WS_ERROR("WSARecv failed with code:", WSAGetLastError());
+                    closesocket(soc_accept);
+                    SAFE_DELETE(soc_client);
+                    SAFE_DELETE(soc_client_info);
+                    return;
+                }
+            }
         }
     }
 
