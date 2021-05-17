@@ -2644,7 +2644,7 @@ namespace ClientServer_IOCP_Model
         int rc;
 
         HANDLE IOCP_object = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-        if (IOCP_object == INVALID_HANDLE_VALUE)
+        if (IOCP_object == NULL)
         {
             WS_ERROR("Create IOCP object failed with code:", GetLastError());
             return;
@@ -2696,15 +2696,15 @@ namespace ClientServer_IOCP_Model
             return;
         }
 
+        SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+        if (soc_accept == INVALID_SOCKET)
+        {
+            WS_ERROR("WSASocket failed with code:", WSAGetLastError());
+            return;
+        }
+
         while (true)
         {
-            SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
-            if (soc_accept == INVALID_SOCKET)
-            {
-                WS_ERROR("WSASocket failed with code:", WSAGetLastError());
-                continue;
-            }
-
             soc_accept = WSAAccept(soc_listen, NULL, NULL, NULL, 0);
             if (soc_accept == INVALID_SOCKET)
             {
