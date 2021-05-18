@@ -2623,8 +2623,8 @@ namespace ClientServer_IOCP_Model
             rc = (int)GetQueuedCompletionStatus(
                 IOCP_object, 
                 &byte_transferred, 
-                (DWORD*)&soc_client_wrapper, 
-                (LPOVERLAPPED*)soc_client_info, 
+                (LPDWORD)&soc_client_wrapper, 
+                (LPOVERLAPPED*)&soc_client_info, 
                 INFINITE
             );
             if (rc == 0)
@@ -2653,7 +2653,7 @@ namespace ClientServer_IOCP_Model
         SYSTEM_INFO sys_info;
         GetSystemInfo(&sys_info);
 
-        for (int i = 0; i < sys_info.dwNumberOfProcessors; i++)
+        for (int i = 0; i < sys_info.dwNumberOfProcessors * 2; i++)
         {
             DWORD worker_id;
             HANDLE worker = CreateThread(NULL, 0, IOCP_Proc, IOCP_object, 0, &worker_id);
@@ -2712,16 +2712,16 @@ namespace ClientServer_IOCP_Model
                 continue;
             }
 
-            SOCKET_WRAPPER* soc_client = new SOCKET_WRAPPER(soc_accept);
+            SOCKET_WRAPPER* soc_client_wrapper = new SOCKET_WRAPPER(soc_accept);
 
-            if (CreateIoCompletionPort((HANDLE)soc_accept, IOCP_object, (DWORD)soc_client, 0) == NULL)
+            if (CreateIoCompletionPort((HANDLE)soc_accept, IOCP_object, (DWORD)soc_client_wrapper, 0) == NULL)
             {
                 closesocket(soc_accept);
-                SAFE_DELETE(soc_client);
+                SAFE_DELETE(soc_client_wrapper);
                 continue;
             }
 
-            SOCKET_INFO* soc_client_info = new SOCKET_INFO(soc_accept);
+            SOCKET_INFO* soc_client_info = new SOCKET_INFO(soc_accept, WSACreateEvent());
             
             DWORD flags = 0;
             DWORD byte_transferred = 0;
@@ -2740,7 +2740,7 @@ namespace ClientServer_IOCP_Model
                 {
                     WS_ERROR("WSARecv failed with code:", WSAGetLastError());
                     closesocket(soc_accept);
-                    SAFE_DELETE(soc_client);
+                    SAFE_DELETE(soc_client_wrapper);
                     SAFE_DELETE(soc_client_info);
                     return;
                 }
