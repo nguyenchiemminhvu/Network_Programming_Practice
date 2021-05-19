@@ -2617,6 +2617,7 @@ namespace ClientServer_IOCP_Model
         SOCKET_WRAPPER *soc_client_wrapper = NULL;
         SOCKET_INFO* soc_client_info = NULL;
         DWORD byte_transferred;
+        DWORD flags = 0;
 
         while (true)
         {
@@ -2633,7 +2634,71 @@ namespace ClientServer_IOCP_Model
                 return 0;
             }
 
+            if (byte_transferred == 0)
+            {
+                WS_LOG("Disconnection on socket:", soc_client_wrapper->socket);
+                closesocket(soc_client_wrapper->socket);
+                SAFE_DELETE(soc_client_wrapper);
+                SAFE_DELETE(soc_client_info);
+                continue;
+            }
 
+            if (soc_client_info->byte_recv == 0)
+            {
+                soc_client_info->byte_recv = byte_transferred;
+            }
+
+            if (soc_client_info->byte_recv)
+            {
+                SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
+                rc = WSASend(
+                    soc_client_info->socket,
+                    &soc_client_info->wsa_buffer,
+                    1,
+                    &soc_client_info->byte_recv,
+                    0,
+                    &soc_client_info->overlapped_structure,
+                    NULL
+                );
+                if (rc == SOCKET_ERROR)
+                {
+                    if (WSAGetLastError() != WSA_IO_PENDING)
+                    {
+                        WS_ERROR("WSASend failed with code:", WSAGetLastError());
+                        closesocket(soc_client_info->socket);
+                        SAFE_DELETE(soc_client_wrapper);
+                        SAFE_DELETE(soc_client_info);
+                        continue;
+                    }
+                }
+
+                soc_client_info->ResetData();
+            }
+
+            if (soc_client_info->byte_recv == 0)
+            {
+                SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
+                rc = WSARecv(
+                    soc_client_info->socket,
+                    &soc_client_info->wsa_buffer,
+                    1,
+                    &soc_client_info->byte_recv,
+                    &flags,
+                    &soc_client_info->overlapped_structure,
+                    NULL
+                );
+                if (rc == SOCKET_ERROR)
+                {
+                    if (WSAGetLastError() != WSA_IO_PENDING)
+                    {
+                        WS_ERROR("WSASend failed with code:", WSAGetLastError());
+                        closesocket(soc_client_info->socket);
+                        SAFE_DELETE(soc_client_wrapper);
+                        SAFE_DELETE(soc_client_info);
+                        continue;
+                    }
+                }
+            }
         }
 
         return 0;
@@ -2653,7 +2718,7 @@ namespace ClientServer_IOCP_Model
         SYSTEM_INFO sys_info;
         GetSystemInfo(&sys_info);
 
-        for (int i = 0; i < sys_info.dwNumberOfProcessors * 2; i++)
+        for (int i = 0; i < sys_info.dwNumberOfProcessors; i++)
         {
             DWORD worker_id;
             HANDLE worker = CreateThread(NULL, 0, IOCP_Proc, IOCP_object, 0, &worker_id);
