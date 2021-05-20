@@ -1,0 +1,8 @@
+Another TCP echo server using IOCP
+
+VERSION HISTORY
+
+1.00 - July 19, 2010
+       Initial version.
+
+oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO
