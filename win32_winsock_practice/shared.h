@@ -2608,6 +2608,8 @@ namespace ClientServer_IOCP_Model
         }
     };
 
+    CRITICAL_SECTION critical_locker;
+
     DWORD __stdcall IOCP_Proc(void *arg)
     {
         int rc;
@@ -2636,8 +2638,16 @@ namespace ClientServer_IOCP_Model
 
             if (byte_transferred == 0)
             {
+                if (!soc_client_wrapper)
+                    return 0;
+
                 WS_LOG("Disconnection on socket:", soc_client_wrapper->socket);
-                closesocket(soc_client_wrapper->socket);
+                rc = closesocket(soc_client_wrapper->socket);
+                if (rc == SOCKET_ERROR)
+                {
+                    WS_ERROR("close socket failed with code:", WSAGetLastError());
+                    return 0;
+                }
                 SAFE_DELETE(soc_client_wrapper);
                 SAFE_DELETE(soc_client_info);
                 continue;
@@ -2665,16 +2675,13 @@ namespace ClientServer_IOCP_Model
                     if (WSAGetLastError() != WSA_IO_PENDING)
                     {
                         WS_ERROR("WSASend failed with code:", WSAGetLastError());
-                        closesocket(soc_client_info->socket);
-                        SAFE_DELETE(soc_client_wrapper);
-                        SAFE_DELETE(soc_client_info);
-                        continue;
+                        return 0;
                     }
                 }
 
                 soc_client_info->ResetData();
             }
-
+            
             if (soc_client_info->byte_recv == 0)
             {
                 SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
@@ -2692,10 +2699,7 @@ namespace ClientServer_IOCP_Model
                     if (WSAGetLastError() != WSA_IO_PENDING)
                     {
                         WS_ERROR("WSASend failed with code:", WSAGetLastError());
-                        closesocket(soc_client_info->socket);
-                        SAFE_DELETE(soc_client_wrapper);
-                        SAFE_DELETE(soc_client_info);
-                        continue;
+                        return 0;
                     }
                 }
             }
@@ -2718,6 +2722,7 @@ namespace ClientServer_IOCP_Model
         SYSTEM_INFO sys_info;
         GetSystemInfo(&sys_info);
 
+        InitializeCriticalSection(&critical_locker);
         for (int i = 0; i < sys_info.dwNumberOfProcessors; i++)
         {
             DWORD worker_id;
@@ -2727,7 +2732,6 @@ namespace ClientServer_IOCP_Model
                 WS_ERROR("CreateThread failed with code:", GetLastError());
                 return;
             }
-            CloseHandle(worker);
         }
 
         hostent* he = gethostbyname("");
