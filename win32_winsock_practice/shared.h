@@ -2592,32 +2592,16 @@ namespace ClientServer_IOCP_Model
         }
     };
 
-    class SOCKET_WRAPPER
-    {
-    public:
-        SOCKET socket;
-
-        SOCKET_WRAPPER(SOCKET s)
-        {
-            socket = s;
-        }
-
-        ~SOCKET_WRAPPER()
-        {
-
-        }
-    };
-
     CRITICAL_SECTION critical_locker;
 
-    DWORD __stdcall IOCP_Proc(void *arg)
+    DWORD __stdcall IOCP_Server_Proc(void *arg)
     {
         int rc;
 
         HANDLE IOCP_object = (HANDLE)arg;
 
-        SOCKET_WRAPPER *soc_client_wrapper = NULL;
         SOCKET_INFO* soc_client_info = NULL;
+        ULONG CompletionKey;
         DWORD byte_transferred;
         DWORD flags = 0;
 
@@ -2626,31 +2610,25 @@ namespace ClientServer_IOCP_Model
             rc = (int)GetQueuedCompletionStatus(
                 IOCP_object, 
                 &byte_transferred, 
-                (LPDWORD)&soc_client_wrapper, 
+                (LPDWORD)&CompletionKey, 
                 (LPOVERLAPPED*)&soc_client_info, 
                 INFINITE
             );
             if (rc == 0)
             {
                 WS_ERROR("GetQueuedCompletionStatus failed with code:", WSAGetLastError());
-                return 0;
+                continue;
             }
+
+            if (!soc_client_info)
+                continue;
 
             if (byte_transferred == 0)
             {
-                if (!soc_client_wrapper)
-                    return 0;
-
-                WS_LOG("Disconnection on socket:", soc_client_wrapper->socket);
-                rc = closesocket(soc_client_wrapper->socket);
-                if (rc == SOCKET_ERROR)
-                {
-                    WS_ERROR("close socket failed with code:", WSAGetLastError());
-                    return 0;
-                }
-                SAFE_DELETE(soc_client_wrapper);
+                WS_LOG("Disconnection on socket:", soc_client_info->socket);
+                rc = closesocket(soc_client_info->socket);
                 SAFE_DELETE(soc_client_info);
-                continue;
+                return 0;
             }
 
             if (soc_client_info->byte_recv == 0)
@@ -2675,7 +2653,7 @@ namespace ClientServer_IOCP_Model
                     if (WSAGetLastError() != WSA_IO_PENDING)
                     {
                         WS_ERROR("WSASend failed with code:", WSAGetLastError());
-                        return 0;
+                        continue;
                     }
                 }
 
@@ -2699,7 +2677,7 @@ namespace ClientServer_IOCP_Model
                     if (WSAGetLastError() != WSA_IO_PENDING)
                     {
                         WS_ERROR("WSASend failed with code:", WSAGetLastError());
-                        return 0;
+                        continue;
                     }
                 }
             }
@@ -2726,12 +2704,13 @@ namespace ClientServer_IOCP_Model
         for (int i = 0; i < sys_info.dwNumberOfProcessors; i++)
         {
             DWORD worker_id;
-            HANDLE worker = CreateThread(NULL, 0, IOCP_Proc, IOCP_object, 0, &worker_id);
+            HANDLE worker = CreateThread(NULL, 0, IOCP_Server_Proc, IOCP_object, 0, &worker_id);
             if (worker == NULL)
             {
                 WS_ERROR("CreateThread failed with code:", GetLastError());
                 return;
             }
+            CloseHandle(worker);
         }
 
         hostent* he = gethostbyname("");
@@ -2781,12 +2760,9 @@ namespace ClientServer_IOCP_Model
                 continue;
             }
 
-            SOCKET_WRAPPER* soc_client_wrapper = new SOCKET_WRAPPER(soc_accept);
-
-            if (CreateIoCompletionPort((HANDLE)soc_accept, IOCP_object, (DWORD)soc_client_wrapper, 0) == NULL)
+            if (CreateIoCompletionPort((HANDLE)soc_accept, IOCP_object, 0, 0) == NULL)
             {
                 closesocket(soc_accept);
-                SAFE_DELETE(soc_client_wrapper);
                 continue;
             }
 
@@ -2809,7 +2785,6 @@ namespace ClientServer_IOCP_Model
                 {
                     WS_ERROR("WSARecv failed with code:", WSAGetLastError());
                     closesocket(soc_accept);
-                    SAFE_DELETE(soc_client_wrapper);
                     SAFE_DELETE(soc_client_info);
                     return;
                 }
@@ -2875,290 +2850,11 @@ namespace ClientServer_IOCP_Model
         closesocket(soc_listen);
     }
 
-    void TCP_Client(const std::string& server_ip)
+    DWORD __stdcall IOCP_Client_Proc(void* arg)
     {
-        std::string command;
-        while (f_prompt("Enter command: ") && std::getline(std::cin, command))
-        {
-            if (command == "exit")
-            {
-                break;
-            }
-            else if (command == "connect")
-            {
-                int rc;
 
-                sockaddr_in server_info = { 0 };
-                server_info.sin_family = AF_INET;
-                server_info.sin_port = htons(PORTS::TCP_SERVER);
-                server_info.sin_addr.s_addr = inet_addr(server_ip.data());
 
-                int server_info_len = sizeof(server_info);
-
-                SOCKET soc_client = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
-                if (soc_client == INVALID_SOCKET)
-                {
-                    WS_ERROR("create socket client failed with code:", WSAGetLastError(), CLIENT);
-                    return;
-                }
-
-                rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
-                if (rc == SOCKET_ERROR)
-                {
-                    WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
-                    closesocket(soc_client);
-                    return;
-                }
-
-                for (int i = 0; i < 10; i++)
-                {
-                    char buffer[1024];
-                    int buffer_len = 1024;
-                    memset(buffer, 0, buffer_len);
-                    strcpy(buffer, "request_data_from_client");
-                    int cur_len = strlen(buffer);
-                    buffer[cur_len] = '_';
-                    buffer[cur_len + 1] = i + '0';
-
-                    rc = send(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
-
-                    memset(buffer, 0, buffer_len);
-                    rc = recv(soc_client, buffer, buffer_len, 0);
-                    if (rc == SOCKET_ERROR)
-                    {
-                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
-                        break;
-                    }
-
-                    f_prompt("Received data from server: ");
-                    f_prompt(buffer);
-                    f_prompt("\n");
-                }
-
-                closesocket(soc_client);
-            }
-            else
-            {
-                WS_LOG("Invalid command", CLIENT);
-            }
-        }
-    }
-
-    void UDP_Client(std::promise<std::string>& p_server_ip)
-    {
-        int rc;
-
-        sockaddr_in server_info = { 0 };
-        server_info.sin_family = AF_INET;
-        server_info.sin_port = htons(PORTS::UDP_SERVER);
-        server_info.sin_addr.s_addr = inet_addr("255.255.255.255");
-
-        SOCKET soc_client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (soc_client == INVALID_SOCKET)
-        {
-            WS_ERROR("create socket failed with code:", WSAGetLastError(), CLIENT);
-            return;
-        }
-
-        BOOL b_broadcast = TRUE;
-        setsockopt(soc_client, SOL_SOCKET, SO_BROADCAST, (char*)&b_broadcast, sizeof(BOOL));
-
-        char buffer[1024];
-        memset(buffer, 0, sizeof(buffer));
-        strcpy(buffer, "server_ip_request");
-
-        rc = sendto(soc_client, buffer, sizeof(buffer), 0, (SOCKADDR*)&server_info, sizeof(server_info));
-        if (rc == SOCKET_ERROR)
-        {
-            WS_ERROR("sendto failed with code:", WSAGetLastError(), CLIENT);
-            closesocket(soc_client);
-            return;
-        }
-
-        memset(buffer, 0, 1024);
-        int server_info_len = sizeof(server_info);
-        rc = recvfrom(soc_client, buffer, 1024, 0, (SOCKADDR*)&server_info, &server_info_len);
-        if (rc == SOCKET_ERROR)
-        {
-            WS_ERROR("recvfrom failed with code:", WSAGetLastError(), CLIENT);
-            closesocket(soc_client);
-            return;
-        }
-
-        f_prompt("TCP server IP: ");
-        f_prompt(buffer);
-        f_prompt("\n");
-
-        p_server_ip.set_value(buffer);
-
-        closesocket(soc_client);
-    }
-}
-
-namespace ClientServer_IOCP_Overlapped_Model
-{
-    auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
-
-    class SOCKET_INFO
-    {
-    public:
-        WSAOVERLAPPED overlapped_structure;
-        SOCKET socket;
-        char buffer[1024];
-        DWORD byte_recv;
-        WSABUF wsa_buffer;
-
-        SOCKET_INFO(SOCKET s, WSAEVENT e = NULL)
-        {
-            socket = s;
-            byte_recv = 0;
-            memset(buffer, 0, 1024);
-            wsa_buffer.buf = buffer;
-            wsa_buffer.len = 1024;
-
-            SecureZeroMemory(&overlapped_structure, sizeof(WSAOVERLAPPED));
-            if (e != WSA_INVALID_EVENT)
-            {
-                overlapped_structure.hEvent = e;
-            }
-        }
-
-        void ResetData()
-        {
-            memset(buffer, 0, 1024);
-            byte_recv = 0;
-            wsa_buffer.buf = buffer;
-            wsa_buffer.len = 1024;
-        }
-    };
-
-    unsigned int __stdcall CompletionRoutineProc(void* arg)
-    {
         return 0;
-    }
-
-    void CompletionRoutineInternal(DWORD err, DWORD transferred, WSAOVERLAPPED* pOverlapped, DWORD flags)
-    {
-
-    }
-
-    void TCP_Server()
-    {
-        int rc;
-
-        hostent* he = gethostbyname("");
-        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
-
-        sockaddr_in soc_listen_info = { 0 };
-        soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
-        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
-
-        SOCKET soc_listen = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
-        if (soc_listen == INVALID_SOCKET)
-        {
-            WS_ERROR("socket failed with error code:", WSAGetLastError());
-            return;
-        }
-
-        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
-        if (rc)
-        {
-            WS_ERROR("bind failed with error code:", WSAGetLastError());
-            closesocket(soc_listen);
-            return;
-        }
-
-        rc = listen(soc_listen, 8);
-        if (rc == SOCKET_ERROR)
-        {
-            WS_ERROR("listen failed with code:", WSAGetLastError());
-            closesocket(soc_listen);
-            return;
-        }
-
-        SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
-        if (soc_accept == INVALID_SOCKET)
-        {
-            WS_ERROR("create accept socket failed with code:", WSAGetLastError());
-            closesocket(soc_listen);
-            return;
-        }
-
-        while (true)
-        {
-            soc_accept = accept(soc_listen, NULL, NULL);
-            if (soc_accept == INVALID_SOCKET)
-            {
-                WS_ERROR("accept failed with code:", WSAGetLastError());
-                continue;
-            }
-
-
-        }
-    }
-
-    void UDP_Server()
-    {
-        int rc;
-
-        hostent* he = gethostbyname("");
-        char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
-
-        sockaddr_in soc_listen_info = { 0 };
-        soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::UDP_SERVER);
-        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
-
-        SOCKET soc_listen = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-        if (soc_listen == INVALID_SOCKET)
-        {
-            WS_ERROR("create udp socket failed with code:", WSAGetLastError());
-            return;
-        }
-
-        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
-        if (rc)
-        {
-            WS_ERROR("bind failed with error code:", WSAGetLastError());
-            closesocket(soc_listen);
-            return;
-        }
-
-        char buffer[1024];
-        int buffer_len = 1024;
-        while (true)
-        {
-            memset(buffer, 0, buffer_len);
-
-            sockaddr_in client_info = { 0 };
-            int client_info_len = sizeof(client_info);
-            rc = recvfrom(soc_listen, buffer, buffer_len, 0, (SOCKADDR*)&client_info, &client_info_len);
-            if (rc == SOCKET_ERROR)
-            {
-                WS_ERROR("recvfrom failed with code:", WSAGetLastError());
-                break;
-            }
-
-            if (std::string(buffer) == std::string("server_ip_request"))
-            {
-                memset(buffer, 0, 1024);
-                strcpy(buffer, serverIP);
-                rc = sendto(soc_listen, buffer, 1024, 0, (SOCKADDR*)&client_info, client_info_len);
-                if (rc == SOCKET_ERROR)
-                {
-                    WS_ERROR("sendto failed with code:", WSAGetLastError());
-                    break;
-                }
-            }
-        }
-
-        closesocket(soc_listen);
     }
 
     void TCP_Client(const std::string& server_ip)
