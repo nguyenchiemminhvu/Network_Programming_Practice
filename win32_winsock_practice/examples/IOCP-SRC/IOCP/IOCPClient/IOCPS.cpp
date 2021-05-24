@@ -689,7 +689,7 @@ void IOCPS::FreeClientContext()
 
 			ReleaseBuffer(pContext->m_pBuffOverlappedPackage);
 #ifdef TRANSFERFILEFUNCTIONALITY		
-			if (pContext->m_File.m_hFile != (unsigned int)INVALID_HANDLE_VALUE)
+			if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
 			{
 
 				pContext->m_File.Close();
@@ -2492,7 +2492,7 @@ ClientContext* IOCPS::AllocateContext()
 	pContext->m_iMaxFileBytes=-1;
 	pContext->m_iFileBytes=-1;
 
-	if (pContext->m_File.m_hFile != (unsigned int)INVALID_HANDLE_VALUE)
+	if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
 		pContext->m_File.Close();
 #endif	
 
@@ -2657,7 +2657,7 @@ inline BOOL IOCPS::ReleaseClientContext(ClientContext *pContext)
 			NotifyContextRelease(pContext);
 			ReleaseBuffer(pContext->m_pBuffOverlappedPackage);
 #ifdef TRANSFERFILEFUNCTIONALITY		
-			if (pContext->m_File.m_hFile != (unsigned int)INVALID_HANDLE_VALUE)
+			if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
 			{
 
 				pContext->m_File.Close();
@@ -3310,7 +3310,7 @@ BOOL IOCPS::PrepareSendFile(ClientContext *pContext, LPCTSTR lpszFilename)
 		pContext->m_ContextLock.Lock();
 		pContext->m_bFileSendMode=TRUE;
 		// close file if it's already open
-		if (pContext->m_File.m_hFile != (int)INVALID_HANDLE_VALUE)
+		if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
 		{
 			pContext->m_File.Close();
 		}
@@ -3405,7 +3405,7 @@ BOOL IOCPS::DisableSendFile(ClientContext *pContext)
 	pContext->m_ContextLock.Lock();
 	// close file if it's already open
 	//if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
-	if (pContext->m_File.m_hFile != (int)INVALID_HANDLE_VALUE)
+	if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
 	{
 		pContext->m_File.Close();
 	}
@@ -3423,7 +3423,7 @@ BOOL IOCPS::DisableReceiveFile(ClientContext *pContext)
 	pContext->m_ContextLock.Lock();
 	// close file if it's already open
 	//if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
-	if (pContext->m_File.m_hFile != (int)INVALID_HANDLE_VALUE)
+	if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
 	{
 		pContext->m_File.Close();
 	}
@@ -3460,7 +3460,7 @@ BOOL IOCPS::PrepareReceiveFile(ClientContext *pContext, LPCTSTR lpszFilename,DWO
 		pContext->m_ContextLock.Lock();
 		// close file if it's already open
 		//if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
-		if (pContext->m_File.m_hFile != (int)INVALID_HANDLE_VALUE)
+		if (pContext->m_File.m_hFile != INVALID_HANDLE_VALUE)
 		{
 			pContext->m_File.Close();
 		}
