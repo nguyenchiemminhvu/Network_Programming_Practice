@@ -2647,8 +2647,6 @@ namespace ClientServer_IOCP_Model
                     continue;
                 }
             }
-
-            closesocket(soc_client_info->socket);
         }
 
         return 0;
@@ -2817,70 +2815,6 @@ namespace ClientServer_IOCP_Model
         closesocket(soc_listen);
     }
 
-    DWORD __stdcall IOCP_Client_Proc(void* arg)
-    {
-        int rc;
-
-        HANDLE IOCP_object = (HANDLE)arg;
-
-        SOCKET_INFO* soc_client_info = NULL;
-        ULONG CompletionKey;
-        DWORD byte_transferred;
-        DWORD flags = 0;
-
-        while (true)
-        {
-            rc = (int)GetQueuedCompletionStatus(
-                IOCP_object,
-                &byte_transferred,
-                (LPDWORD)&CompletionKey,
-                (LPOVERLAPPED*)&soc_client_info,
-                INFINITE
-            );
-            if (rc == 0)
-            {
-                WS_ERROR("GetQueuedCompletionStatus failed with code:", WSAGetLastError());
-                break;
-            }
-
-            if (!soc_client_info)
-                continue;
-
-            if (byte_transferred == 0)
-            {
-                WS_LOG("Disconnection on socket:", soc_client_info->socket);
-                rc = closesocket(soc_client_info->socket);
-                SAFE_DELETE(soc_client_info);
-                return 0;
-            }
-
-            SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
-            rc = WSARecv(
-                soc_client_info->socket,
-                &soc_client_info->wsa_buffer,
-                1,
-                &soc_client_info->byte_recv,
-                &flags,
-                &soc_client_info->overlapped_structure,
-                NULL
-            );
-            if (rc == SOCKET_ERROR)
-            {
-                if (WSAGetLastError() != WSA_IO_PENDING)
-                {
-                    WS_ERROR("WSASend failed with code:", WSAGetLastError());
-                    continue;
-                }
-            }
-
-            WS_LOG(soc_client_info->buffer, CLIENT);
-        }
-
-        closesocket(soc_client_info->socket);
-
-        return 0;
-    }
-
     void TCP_Client(const std::string& server_ip)
     {
         std::string command;
@@ -2893,28 +2827,6 @@ namespace ClientServer_IOCP_Model
             else if (command == "connect")
             {
                 int rc;
-
-                HANDLE IOCP_object = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
-                if (IOCP_object == NULL)
-                {
-                    WS_ERROR("Create IOCP object failed with code:", GetLastError());
-                    return;
-                }
-
-                SYSTEM_INFO sys_info;
-                GetSystemInfo(&sys_info);
-
-                for (int i = 0; i < sys_info.dwNumberOfProcessors; i++)
-                {
-                    DWORD worker_id;
-                    HANDLE worker = CreateThread(NULL, 0, IOCP_Client_Proc, IOCP_object, 0, &worker_id);
-                    if (worker == NULL)
-                    {
-                        WS_ERROR("CreateThread failed with code:", GetLastError());
-                        return;
-                    }
-                    CloseHandle(worker);
-                }
 
                 sockaddr_in server_info = { 0 };
                 server_info.sin_family = AF_INET;
@@ -2930,7 +2842,7 @@ namespace ClientServer_IOCP_Model
                     return;
                 }
 
-                rc = WSAConnect(soc_client, (SOCKADDR*)&server_info, server_info_len, NULL, NULL, NULL, NULL);
+                rc = connect(soc_client, (SOCKADDR*)&server_info, server_info_len);
                 if (rc == SOCKET_ERROR)
                 {
                     WS_ERROR("connect failed with code:", WSAGetLastError(), CLIENT);
@@ -2938,40 +2850,37 @@ namespace ClientServer_IOCP_Model
                     return;
                 }
 
-                if (CreateIoCompletionPort((HANDLE)soc_client, IOCP_object, 0, 0) == NULL)
-                {
-                    WS_ERROR("attach socket with iocp object failed with code:", GetLastError(), CLIENT);
-                    closesocket(soc_client);
-                    return;
-                }
-
-                SOCKET_INFO* soc_client_info = new SOCKET_INFO(soc_client, WSACreateEvent());
-
                 for (int i = 0; i < 10; i++)
                 {
-                    strcpy(soc_client_info->buffer, "request_data_from_client");
-                    int cur_len = strlen(soc_client_info->buffer);
-                    soc_client_info->buffer[cur_len] = '_';
-                    soc_client_info->buffer[cur_len + 1] = i + '0';
+                    char buffer[1024];
+                    int buffer_len = 1024;
+                    memset(buffer, 0, buffer_len);
+                    strcpy(buffer, "request_data_from_client");
+                    int cur_len = strlen(buffer);
+                    buffer[cur_len] = '_';
+                    buffer[cur_len + 1] = i + '0';
 
-                    rc = WSASend(
-                        soc_client_info->socket,
-                        &soc_client_info->wsa_buffer,
-                        1,
-                        &soc_client_info->byte_recv,
-                        0,
-                        &soc_client_info->overlapped_structure,
-                        NULL
-                    );
+                    rc = send(soc_client, buffer, buffer_len, 0);
                     if (rc == SOCKET_ERROR)
                     {
-                        if (WSAGetLastError() != WSA_IO_PENDING)
-                        {
-                            WS_ERROR("WSASend failed with code:", WSAGetLastError(), CLIENT);
-                            break;
-                        }
+                        WS_LOG("send failed with code:", WSAGetLastError(), CLIENT);
+                        break;
                     }
+
+                    memset(buffer, 0, buffer_len);
+                    rc = recv(soc_client, buffer, buffer_len, 0);
+                    if (rc == SOCKET_ERROR)
+                    {
+                        WS_LOG("recv failed with code:", WSAGetLastError(), CLIENT);
+                        break;
+                    }
+
+                    f_prompt("Received data from server: ");
+                    f_prompt(buffer);
+                    f_prompt("\n");
                 }
+
+                closesocket(soc_client);
             }
             else
             {
