@@ -2666,7 +2666,9 @@ namespace ClientServer_IOCP_Model
             }
         }
 
-        DWORD bytes_transferred;
+        DWORD flags = 0;
+        DWORD bytes_transferred = 0;
+        WSABUF wsa_buffer;
         WSAOVERLAPPED* listen_overlapped_result = NULL;
         SOCKET_STATE* listen_state_result = NULL;
         SOCKET_STATE* accept_state_result = NULL;
@@ -2705,7 +2707,27 @@ namespace ClientServer_IOCP_Model
                 }
 
                 // receiving incoming data
-
+                memset(listen_overlapped_result, 0, sizeof(WSAOVERLAPPED));
+                accept_state_result->operation_type = OP_READ;
+                wsa_buffer = { 1024, accept_state_result->buffer };
+                rc = WSARecv(
+                    accept_state_result->socket,
+                    &wsa_buffer,
+                    1,
+                    NULL,
+                    &flags,
+                    listen_overlapped_result,
+                    NULL
+                );
+                if (rc == SOCKET_ERROR)
+                {
+                    if (WSAGetLastError() != WSA_IO_PENDING)
+                    {
+                        WS_ERROR("WSARecv failed with code:", WSAGetLastError());
+                        return;
+                    }
+                }
+                WS_LOG(wsa_buffer.buf);
                 
                 // accepting new connection
                 soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
@@ -2742,9 +2764,7 @@ namespace ClientServer_IOCP_Model
 
             default:
                 WS_LOG("unknown behaviour!!!");
-                closesocket(listen_state_result->socket);
-                SAFE_DELETE(listen_state_result);
-                SAFE_DELETE(listen_overlapped_result);
+                //closesocket(listen_state_result->socket);
                 break;
             }
         }
@@ -2832,7 +2852,7 @@ namespace ClientServer_IOCP_Model
 
                 int server_info_len = sizeof(server_info);
 
-                SOCKET soc_client = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+                SOCKET soc_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
                 if (soc_client == INVALID_SOCKET)
                 {
                     WS_ERROR("create socket client failed with code:", WSAGetLastError(), CLIENT);
