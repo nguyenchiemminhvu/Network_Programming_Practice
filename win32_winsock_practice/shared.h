@@ -8,6 +8,7 @@
 #define __SHARED_H__
 
 #include <winsock2.h> // always include winsock2.h before windows.h
+#include <MSWSock.h>
 #include <WS2tcpip.h>
 #include <iphlpapi.h>
 #include <ioapiset.h>
@@ -2558,142 +2559,65 @@ namespace ClientServer_IOCP_Model
 {
     auto f_prompt = [](const std::string& prompt) -> bool { std::cout << prompt; return true; };
 
-    class SOCKET_INFO
+    enum // socket operations
     {
-    public:
-        WSAOVERLAPPED overlapped_structure;
-        SOCKET socket;
-        SOCKADDR_STORAGE client_info;
-        char buffer[1024];
-        DWORD byte_recv;
-        WSABUF wsa_buffer;
-
-        SOCKET_INFO(SOCKET s, WSAEVENT e = NULL)
-        {
-            socket = s;
-            byte_recv = 0;
-            memset(buffer, 0, 1024);
-            wsa_buffer.buf = buffer;
-            wsa_buffer.len = 1024;
-
-            SecureZeroMemory(&overlapped_structure, sizeof(WSAOVERLAPPED));
-            if (e != WSA_INVALID_EVENT)
-            {
-                overlapped_structure.hEvent = e;
-            }
-        }
-
-        void ResetData()
-        {
-            memset(buffer, 0, 1024);
-            byte_recv = 0;
-            wsa_buffer.buf = buffer;
-            wsa_buffer.len = 1024;
-        }
+        OP_NONE,
+        OP_ACCEPT,
+        OP_READ,
+        OP_WRITE
     };
 
-    DWORD __stdcall IOCP_Server_Proc(void *arg)
+    class SOCKET_STATE
     {
-        int rc;
+    public:
+        int operation_type;
+        SOCKET socket;
+        DWORD buffer_len;
+        char buffer[1024];
+    };
 
-        HANDLE IOCP_object = (HANDLE)arg;
-
-        SOCKET_INFO* soc_client_info = NULL;
-        ULONG CompletionKey;
-        DWORD byte_transferred;
-        DWORD flags = 0;
-
-        while (true)
-        {
-            rc = (int)GetQueuedCompletionStatus(
-                IOCP_object, 
-                &byte_transferred, 
-                (LPDWORD)&CompletionKey, 
-                (LPOVERLAPPED*)&soc_client_info, 
-                INFINITE
-            );
-            if (rc == 0)
-            {
-                WS_ERROR("GetQueuedCompletionStatus failed with code:", WSAGetLastError());
-                break;
-            }
-
-            if (!soc_client_info)
-                continue;
-
-            if (byte_transferred == 0)
-            {
-                WS_LOG("Disconnection on socket:", soc_client_info->socket);
-                rc = closesocket(soc_client_info->socket);
-                SAFE_DELETE(soc_client_info);
-                return 0;
-            }
-
-            SecureZeroMemory(&soc_client_info->overlapped_structure, sizeof(WSAOVERLAPPED));
-            rc = WSASend(
-                soc_client_info->socket,
-                &soc_client_info->wsa_buffer,
-                1,
-                &soc_client_info->byte_recv,
-                0,
-                &soc_client_info->overlapped_structure,
-                NULL
-            );
-            if (rc == SOCKET_ERROR)
-            {
-                if (WSAGetLastError() != WSA_IO_PENDING)
-                {
-                    WS_ERROR("WSASend failed with code:", WSAGetLastError());
-                    continue;
-                }
-            }
-        }
-
-        return 0;
-    }
+    HANDLE IOCP_object;
+    SOCKET soc_listen;
+    SOCKET_STATE soc_listen_state;
+    WSAOVERLAPPED soc_listen_overlapped;
+    LPFN_ACCEPTEX fn_accept_ex;
+    GUID guid_accept_ex = WSAID_ACCEPTEX;
 
     void TCP_Server()
     {
         int rc;
 
-        HANDLE IOCP_object = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
+        IOCP_object = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
         if (IOCP_object == NULL)
         {
-            WS_ERROR("Create IOCP object failed with code:", GetLastError());
+            WS_ERROR("Create IOCP object failed with code:", WSAGetLastError());
+            return;
+        }
+
+        soc_listen = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+        if (soc_listen == INVALID_SOCKET)
+        {
+            WS_ERROR("create listen socket failed with error code:", WSAGetLastError());
+            return;
+        }
+
+        soc_listen_state.socket = 0;
+        soc_listen_state.operation_type = OP_ACCEPT;
+        if (CreateIoCompletionPort((HANDLE)soc_listen, IOCP_object, (ULONG_PTR)&soc_listen_state, 0) != IOCP_object)
+        {
+            WS_ERROR("Attach listen socket to IOCP object failed with code:", WSAGetLastError());
             return;
         }
         
-        SYSTEM_INFO sys_info;
-        GetSystemInfo(&sys_info);
-
-        for (int i = 0; i < sys_info.dwNumberOfProcessors; i++)
-        {
-            DWORD worker_id;
-            HANDLE worker = CreateThread(NULL, 0, IOCP_Server_Proc, IOCP_object, 0, &worker_id);
-            if (worker == NULL)
-            {
-                WS_ERROR("CreateThread failed with code:", GetLastError());
-                return;
-            }
-            CloseHandle(worker);
-        }
-
         hostent* he = gethostbyname("");
         char* serverIP = inet_ntoa(*(in_addr*)*he->h_addr_list);
 
-        sockaddr_in soc_listen_info = { 0 };
-        soc_listen_info.sin_family = AF_INET;
-        soc_listen_info.sin_port = htons(PORTS::TCP_SERVER);
-        soc_listen_info.sin_addr.s_addr = inet_addr(serverIP);
+        sockaddr_in soc_listen_addr = { 0 };
+        soc_listen_addr.sin_family = AF_INET;
+        soc_listen_addr.sin_port = htons(PORTS::TCP_SERVER);
+        soc_listen_addr.sin_addr.s_addr = inet_addr(serverIP);
 
-        SOCKET soc_listen = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
-        if (soc_listen == INVALID_SOCKET)
-        {
-            WS_ERROR("socket failed with error code:", WSAGetLastError());
-            return;
-        }
-        
-        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_info, sizeof(soc_listen_info));
+        rc = bind(soc_listen, (SOCKADDR*)&soc_listen_addr, sizeof(soc_listen_addr));
         if (rc)
         {
             WS_ERROR("bind failed with error code:", WSAGetLastError());
@@ -2709,51 +2633,45 @@ namespace ClientServer_IOCP_Model
             return;
         }
 
+        DWORD dw_bytes;
+        WSAIoctl(soc_listen, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex), &fn_accept_ex, sizeof(fn_accept_ex), &dw_bytes, NULL, NULL);
+
         SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
         if (soc_accept == INVALID_SOCKET)
         {
-            WS_ERROR("WSASocket failed with code:", WSAGetLastError());
+            WS_ERROR("create accept socket failed with code:", WSAGetLastError());
             return;
         }
 
+        soc_listen_state.socket = soc_accept;
+        memset(&soc_listen_overlapped, 0, sizeof(WSAOVERLAPPED));
+
+        rc = fn_accept_ex(
+            soc_listen,
+            soc_accept,
+            soc_listen_state.buffer,
+            0,
+            sizeof(struct sockaddr_in) + 16,
+            sizeof(struct sockaddr_in) + 16,
+            NULL,
+            &soc_listen_overlapped
+        );
+
+        if (!rc)
+        {
+            if (WSAGetLastError() != WSA_IO_PENDING)
+            {
+                WS_ERROR("accept_ex failed with code:", WSAGetLastError());
+                return;
+            }
+        }
+
+        DWORD buffer_len;
+        WSAOVERLAPPED* overlapped_result;
+        SOCKET_STATE* socket_state_result;
         while (true)
         {
-            soc_accept = WSAAccept(soc_listen, NULL, NULL, NULL, 0);
-            if (soc_accept == INVALID_SOCKET)
-            {
-                WS_ERROR("accept failed with code:", WSAGetLastError());
-                continue;
-            }
-
-            if (CreateIoCompletionPort((HANDLE)soc_accept, IOCP_object, 0, 0) == NULL)
-            {
-                closesocket(soc_accept);
-                continue;
-            }
-
-            SOCKET_INFO* soc_client_info = new SOCKET_INFO(soc_accept, WSACreateEvent());
             
-            DWORD flags = 0;
-            DWORD byte_transferred = 0;
-            rc = WSARecv(
-                soc_accept, 
-                &soc_client_info->wsa_buffer, 
-                1, 
-                &byte_transferred, 
-                &flags, 
-                &soc_client_info->overlapped_structure, 
-                NULL
-            );
-            if (rc == SOCKET_ERROR)
-            {
-                if (WSAGetLastError() != WSA_IO_PENDING)
-                {
-                    WS_ERROR("WSARecv failed with code:", WSAGetLastError());
-                    closesocket(soc_accept);
-                    SAFE_DELETE(soc_client_info);
-                    return;
-                }
-            }
         }
     }
 
