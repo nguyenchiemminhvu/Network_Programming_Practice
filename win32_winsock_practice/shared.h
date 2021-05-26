@@ -2633,6 +2633,7 @@ namespace ClientServer_IOCP_Model
             return;
         }
 
+        // load the AcceptEx function
         DWORD dw_bytes;
         WSAIoctl(soc_listen, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex), &fn_accept_ex, sizeof(fn_accept_ex), &dw_bytes, NULL, NULL);
 
@@ -2729,7 +2730,7 @@ namespace ClientServer_IOCP_Model
                 }
                 WS_LOG(wsa_buffer.buf);
                 
-                // accepting new connection
+                // accepting new connection on new socket
                 soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
                 if (soc_accept == INVALID_SOCKET)
                 {
@@ -2754,7 +2755,7 @@ namespace ClientServer_IOCP_Model
 
             case OP_READ:
                 WS_LOG("OP_READ completed");
-
+                
                 break;
 
             case OP_WRITE:
@@ -2763,7 +2764,7 @@ namespace ClientServer_IOCP_Model
                 break;
 
             default:
-                WS_LOG("unknown behaviour!!!");
+                WS_LOG("Unknown operation!!!");
                 //closesocket(listen_state_result->socket);
                 break;
             }
