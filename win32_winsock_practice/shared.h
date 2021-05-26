@@ -2667,49 +2667,91 @@ namespace ClientServer_IOCP_Model
         }
 
         DWORD bytes_transferred;
-        WSAOVERLAPPED* overlapped_result = NULL;
-        SOCKET_STATE* socket_state_result = NULL;
+        WSAOVERLAPPED* listen_overlapped_result = NULL;
+        SOCKET_STATE* listen_state_result = NULL;
+        SOCKET_STATE* accept_state_result = NULL;
         while (true)
         {
-            rc = GetQueuedCompletionStatus(IOCP_object, &bytes_transferred, (ULONG_PTR*)&socket_state_result, &overlapped_result, INFINITE);
+            rc = GetQueuedCompletionStatus(IOCP_object, &bytes_transferred, (ULONG_PTR*)&listen_state_result, &listen_overlapped_result, INFINITE);
             if (!rc)
             {
                 WS_ERROR("Get completion port status failed with code:", GetLastError());
                 continue;
             }
 
-            if (!socket_state_result || !overlapped_result)
+            if (!listen_state_result || !listen_overlapped_result)
             {
                 WS_LOG("Unknown behaviour");
                 break;
             }
 
-            switch (socket_state_result->operation_type)
+            switch (listen_state_result->operation_type)
             {
             case OP_ACCEPT:
                 WS_LOG("OP_ACCEPT completed");
+                setsockopt(
+                    listen_state_result->socket, 
+                    SOL_SOCKET, 
+                    SO_UPDATE_ACCEPT_CONTEXT, 
+                    (char*)&soc_listen, 
+                    sizeof(soc_listen)
+                );
+                accept_state_result = new SOCKET_STATE();
+                accept_state_result->socket = listen_state_result->socket;
+                if (CreateIoCompletionPort((HANDLE)accept_state_result->socket, IOCP_object, (ULONG_PTR)accept_state_result, 0) != IOCP_object)
+                {
+                    WS_ERROR("Create io completion port failed in line", __LINE__);
+                    return;
+                }
+
+                // receiving incoming data
+
+                
+                // accepting new connection
+                soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+                if (soc_accept == INVALID_SOCKET)
+                {
+                    WS_ERROR("create accept socket failed with code:", WSAGetLastError());
+                    return;
+                }
+
+                soc_listen_state.socket = soc_accept;
+                memset(&soc_listen_overlapped, 0, sizeof(WSAOVERLAPPED));
+
+                rc = fn_accept_ex(
+                    soc_listen,
+                    soc_accept,
+                    soc_listen_state.buffer,
+                    0,
+                    sizeof(struct sockaddr_in) + 16,
+                    sizeof(struct sockaddr_in) + 16,
+                    NULL,
+                    &soc_listen_overlapped
+                );
                 break;
 
             case OP_READ:
                 WS_LOG("OP_READ completed");
+
                 break;
 
             case OP_WRITE:
                 WS_LOG("OP_WRITE completed");
+
                 break;
 
             default:
                 WS_LOG("unknown behaviour!!!");
-                closesocket(socket_state_result->socket);
-                SAFE_DELETE(socket_state_result);
-                SAFE_DELETE(overlapped_result);
+                closesocket(listen_state_result->socket);
+                SAFE_DELETE(listen_state_result);
+                SAFE_DELETE(listen_overlapped_result);
                 break;
             }
         }
 
         closesocket(soc_listen);
-        SAFE_DELETE(socket_state_result);
-        SAFE_DELETE(overlapped_result);
+        SAFE_DELETE(listen_state_result);
+        SAFE_DELETE(listen_overlapped_result);
     }
 
     void UDP_Server()
