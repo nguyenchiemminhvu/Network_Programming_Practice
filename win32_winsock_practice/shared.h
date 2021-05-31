@@ -2633,10 +2633,6 @@ namespace ClientServer_IOCP_Model
             return;
         }
 
-        // load the AcceptEx function
-        DWORD dw_bytes;
-        WSAIoctl(soc_listen, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex), &fn_accept_ex, sizeof(fn_accept_ex), &dw_bytes, NULL, NULL);
-
         SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
         if (soc_accept == INVALID_SOCKET)
         {
@@ -2647,6 +2643,9 @@ namespace ClientServer_IOCP_Model
         soc_listen_state.socket = soc_accept;
         memset(&soc_listen_overlapped, 0, sizeof(WSAOVERLAPPED));
 
+        // load the AcceptEx function
+        DWORD dw_bytes;
+        WSAIoctl(soc_listen, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex), &fn_accept_ex, sizeof(fn_accept_ex), &dw_bytes, NULL, NULL);
         rc = fn_accept_ex(
             soc_listen,
             soc_accept,
@@ -3092,10 +3091,6 @@ namespace ClientServer_IOCP_Mutithread_Model
             return;
         }
 
-        // load the AcceptEx function
-        DWORD dw_bytes;
-        WSAIoctl(soc_listen, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex), &fn_accept_ex, sizeof(fn_accept_ex), &dw_bytes, NULL, NULL);
-
         SOCKET soc_accept = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
         if (soc_accept == INVALID_SOCKET)
         {
@@ -3106,6 +3101,9 @@ namespace ClientServer_IOCP_Mutithread_Model
         soc_listen_state.socket = soc_accept;
         memset(&soc_listen_overlapped, 0, sizeof(WSAOVERLAPPED));
 
+        // load the AcceptEx function
+        DWORD dw_bytes;
+        WSAIoctl(soc_listen, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, sizeof(guid_accept_ex), &fn_accept_ex, sizeof(fn_accept_ex), &dw_bytes, NULL, NULL);
         rc = fn_accept_ex(
             soc_listen,
             soc_accept,
