@@ -1,15 +1,20 @@
 #ifndef DIALOG_H
 #define DIALOG_H
 
+#include <QDebug>
 #include <QDialog>
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QList>
+#include <QNetworkInterface>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTcpServer>
 #include <QString>
 #include <QVector>
+#include <QTime>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Random_Quote_Dialog; }
@@ -34,7 +39,10 @@ public slots:
 private:
     void InitUI();
     void InitQuotes();
+    void InitRandom();
     void InitRandomQuoteServer();
+
+    int RandomInt(int low, int high);
 
 private:
     QVector<QString> m_quotes;
