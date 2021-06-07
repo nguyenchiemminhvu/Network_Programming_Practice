@@ -2,13 +2,16 @@
 #define DIALOG_H
 
 #include <QDialog>
+#include <QWidget>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
 #include <QTcpServer>
 #include <QString>
 #include <QVector>
 
 QT_BEGIN_NAMESPACE
-class QLabel;
-class QTcpServer;
 namespace Ui { class Random_Quote_Dialog; }
 QT_END_NAMESPACE
 
@@ -36,7 +39,7 @@ private:
 private:
     QVector<QString> m_quotes;
 
-    QLabel *status = NULL;
-    QTcpServer *server = NULL;
+    QLabel *m_status = NULL;
+    QTcpServer *m_server = NULL;
 };
 #endif // DIALOG_H
