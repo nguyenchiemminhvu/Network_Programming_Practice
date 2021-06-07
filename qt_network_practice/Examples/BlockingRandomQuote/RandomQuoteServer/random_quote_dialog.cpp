@@ -54,7 +54,7 @@ void Random_Quote_Dialog::InitQuotes()
                 <<  "Today Christians spend more money on dog food then missions -Leonard Ravenhill"
                 <<  "He must increase, but I must decrease. -John the Baptist"
                 <<  "Here am I. Send me. -Isaiah"
-                 <<  "Some wish to live within the sound of a chapel bell, I want to run a rescue shop within a yard of Hell. -C.T. Studd";
+                <<  "Some wish to live within the sound of a chapel bell, I want to run a rescue shop within a yard of Hell. -C.T. Studd";
 }
 
 void Random_Quote_Dialog::InitRandom()
