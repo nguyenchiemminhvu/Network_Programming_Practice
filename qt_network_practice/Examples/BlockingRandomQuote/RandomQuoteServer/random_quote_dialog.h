@@ -12,6 +12,9 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QTcpServer>
+#include <QTcpSocket>
+#include <QByteArray>
+#include <QDataStream>
 #include <QString>
 #include <QVector>
 #include <QTime>

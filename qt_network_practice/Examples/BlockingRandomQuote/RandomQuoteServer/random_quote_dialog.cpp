@@ -21,7 +21,17 @@ Random_Quote_Dialog::~Random_Quote_Dialog()
 void Random_Quote_Dialog::OnClientConnection()
 {
     int quote_index = RandomInt(0, m_quotes.size() - 1);
-    qDebug() << m_quotes[quote_index];
+
+    QByteArray quote_to_send;
+    QDataStream quote_stream(&quote_to_send, QIODevice::WriteOnly);
+    quote_stream << m_quotes[quote_index];
+
+    QTcpSocket * client = m_server->nextPendingConnection();
+    connect(client, &QAbstractSocket::disconnected, client, &QObject::deleteLater);
+
+    client->flush();
+    client->write(quote_to_send);
+    client->disconnectFromHost();
 }
 
 void Random_Quote_Dialog::InitUI()
