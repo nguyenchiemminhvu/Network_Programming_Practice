@@ -89,6 +89,7 @@ void Random_Quote_Dialog::SendRequestToServer()
 
     m_thread = new QThread();
     m_worker = new RandomQuoteWorker(m_leHost->text(), m_lePort->text());
+    m_worker->BindingToItself();
     m_worker->BindingToThread(m_thread);
     m_worker->BindingToSender(this);
     m_thread->start();

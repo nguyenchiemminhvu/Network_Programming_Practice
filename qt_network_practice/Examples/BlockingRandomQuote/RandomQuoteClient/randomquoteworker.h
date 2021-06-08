@@ -5,6 +5,10 @@
 #include <QDialog>
 #include <QString>
 #include <QThread>
+#include <QTcpSocket>
+#include <QDataStream>
+
+#include <QDebug>
 
 class Random_Quote_Dialog;
 
@@ -16,15 +20,18 @@ public:
     explicit RandomQuoteWorker(const QString &server, const QString &port, QObject *parent = nullptr);
     virtual ~RandomQuoteWorker();
 
+    void BindingToItself();
     void BindingToThread(QThread *thread);
     void BindingToSender(Random_Quote_Dialog *sender);
 
 signals:
+    void Error(int, const QString&);
     void Finished();
     void QuoteAvailable(const QString &quote);
 
 public slots:
     void Process();
+    void OnErrorHappenned(int soc_error, const QString &message);
 
 private:
     QString m_server;
