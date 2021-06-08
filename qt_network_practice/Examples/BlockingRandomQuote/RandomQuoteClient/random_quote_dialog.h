@@ -4,13 +4,17 @@
 #include <QDialog>
 #include <QWidget>
 #include <QString>
+#include <QIntValidator>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QDialogButtonBox>
+#include <QGridLayout>
 #include <QAction>
 #include <QThread>
 #include <QTcpSocket>
+#include <QNetworkInterface>
 
 #include "randomquoteworker.h"
 
