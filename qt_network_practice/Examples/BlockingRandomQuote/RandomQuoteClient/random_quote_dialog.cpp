@@ -59,27 +59,43 @@ void Random_Quote_Dialog::InitUI()
     main_layout->addWidget(button_box, 2, 1, 1, 2);
     main_layout->addWidget(m_pteQuote, 3, 0, 2, 3);
     this->setLayout(main_layout);
+
+    // initialize connections between widgets
+    connect(m_leHost, &QLineEdit::textChanged, this, &Random_Quote_Dialog::ReadyToSendRequest);
+    connect(m_lePort, &QLineEdit::textChanged, this, &Random_Quote_Dialog::ReadyToSendRequest);
+    connect(m_pbQuit, &QPushButton::clicked, this, &Random_Quote_Dialog::close);
+    connect(m_pbQuoteRequest, &QPushButton::clicked, this, &Random_Quote_Dialog::SendRequestToServer);
 }
 
 void Random_Quote_Dialog::ReadyToSendRequest()
 {
+    if (!m_pbQuoteRequest)
+        return;
+
     if (m_leHost && !m_leHost->text().isEmpty()
      && m_lePort && !m_lePort->text().isEmpty())
     {
-        if (m_pbQuoteRequest)
-        {
-            m_pbQuoteRequest->setEnabled(true);
-        }
+        m_pbQuoteRequest->setEnabled(true);
+    }
+    else
+    {
+        m_pbQuoteRequest->setEnabled(false);
     }
 }
 
 void Random_Quote_Dialog::SendRequestToServer()
 {
+    m_pbQuoteRequest->setEnabled(false);
 
+    m_thread = new QThread();
+    m_worker = new RandomQuoteWorker(m_leHost->text(), m_lePort->text());
+    m_worker->BindingToThread(m_thread);
+    m_worker->BindingToSender(this);
+    m_thread->start();
 }
 
 void Random_Quote_Dialog::DisplayQuote(const QString &quote)
 {
-
+    m_pteQuote->document()->setPlainText(quote);
 }
 
