@@ -38,14 +38,14 @@ void RandomQuoteWorker::Process()
     quint16 port = m_port.toInt();
     QTcpSocket *client = new QTcpSocket();
     client->connectToHost(m_server, port);
-    if (!client->waitForConnected(3000))
+    if (!client->waitForConnected())
     {
         emit Error(1, client->errorString());
         emit Finished();
         return;
     }
 
-    if (!client->waitForReadyRead(3000))
+    if (!client->waitForReadyRead())
     {
         emit Error(2, client->errorString());
         emit Finished();
