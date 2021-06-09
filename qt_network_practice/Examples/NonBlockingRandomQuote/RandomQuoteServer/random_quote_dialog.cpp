@@ -48,15 +48,14 @@ void Random_Quote_Dialog::InitServer()
         m_server_ip = QHostAddress(QHostAddress::LocalHost).toString();
     }
 
-    m_server = new Random_Quote_Server();
-    m_server->listen(QHostAddress(m_server_ip));
-    if (!m_server->isListening())
+    m_server.listen(QHostAddress(m_server_ip));
+    if (!m_server.isListening())
     {
         qDebug() << "Server is not listening";
         this->close();
         return;
     }
-    m_server_port = m_server->serverPort();
+    m_server_port = m_server.serverPort();
 }
 
 void Random_Quote_Dialog::EstablishSignalsAndSlots()

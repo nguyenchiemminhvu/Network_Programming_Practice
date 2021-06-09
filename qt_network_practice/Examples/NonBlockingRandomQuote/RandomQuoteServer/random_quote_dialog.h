@@ -38,6 +38,6 @@ private:
 
     QString m_server_ip;
     quint16 m_server_port;
-    Random_Quote_Server *m_server;
+    Random_Quote_Server m_server;
 };
 #endif // DIALOG_H

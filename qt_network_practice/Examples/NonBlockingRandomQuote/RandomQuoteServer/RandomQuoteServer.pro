@@ -20,11 +20,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     main.cpp \
     random_quote_dialog.cpp \
-    random_quote_server.cpp
+    random_quote_server.cpp \
+    random_quote_worker.cpp
 
 HEADERS += \
     random_quote_dialog.h \
-    random_quote_server.h
+    random_quote_server.h \
+    random_quote_worker.h
 
 FORMS += \
     random_quote_dialog.ui
