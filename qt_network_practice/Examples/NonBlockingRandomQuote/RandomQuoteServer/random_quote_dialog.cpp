@@ -48,10 +48,9 @@ void Random_Quote_Dialog::InitServer()
         m_server_ip = QHostAddress(QHostAddress::LocalHost).toString();
     }
 
-    m_server.listen(QHostAddress(m_server_ip));
-    if (!m_server.isListening())
+    if (!m_server.listen())
     {
-        qDebug() << "Server is not listening";
+        qDebug() << tr("Server is not listening (%1 - %2)").arg(m_server_ip).arg(m_server_port);
         this->close();
         return;
     }

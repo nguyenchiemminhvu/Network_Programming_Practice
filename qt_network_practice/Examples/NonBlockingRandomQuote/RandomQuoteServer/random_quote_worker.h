@@ -2,8 +2,11 @@
 #define RANDOM_QUOTE_WORKER_H
 
 #include <QObject>
-#include <QString>
 #include <QThread>
+#include <QTcpSocket>
+#include <QString>
+#include <QByteArray>
+#include <QDataStream>
 #include <QDebug>
 
 class Random_Quote_Server;

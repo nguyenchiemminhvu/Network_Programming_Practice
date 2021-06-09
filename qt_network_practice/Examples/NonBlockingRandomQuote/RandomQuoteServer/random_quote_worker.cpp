@@ -34,7 +34,22 @@ void Random_Quote_Worker::SomethingWrong(int error_code, const QString &message)
 
 void Random_Quote_Worker::Process()
 {
+    QTcpSocket client;
+    if (!client.setSocketDescriptor(socket_descriptor))
+    {
+        emit Error(1, client.errorString());
+        return;
+    }
 
+    QByteArray buffer;
+    QDataStream buffer_stream(&buffer, QTcpSocket::OpenModeFlag::WriteOnly);
+    buffer_stream << quote_to_send;
+
+    QThread::currentThread()->sleep(3);
+
+    client.write(buffer);
+    client.disconnectFromHost();
+    client.waitForDisconnected();
 
     emit Finished();
 }
