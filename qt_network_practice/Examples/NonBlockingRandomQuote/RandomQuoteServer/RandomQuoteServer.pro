@@ -1,4 +1,6 @@
-QT       += core gui
+QT       += core
+QT += gui
+QT += network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -17,10 +19,12 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
     main.cpp \
-    random_quote_dialog.cpp
+    random_quote_dialog.cpp \
+    random_quote_server.cpp
 
 HEADERS += \
-    random_quote_dialog.h
+    random_quote_dialog.h \
+    random_quote_server.h
 
 FORMS += \
     random_quote_dialog.ui
