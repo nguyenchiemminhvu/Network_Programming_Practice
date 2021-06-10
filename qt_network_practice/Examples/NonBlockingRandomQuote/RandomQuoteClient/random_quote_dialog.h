@@ -10,6 +10,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QPlainTextEdit>
+#include <QGridLayout>
 #include <QDebug>
 
 QT_BEGIN_NAMESPACE
@@ -27,6 +28,7 @@ public:
 signals:
 
 public slots:
+    void ReadyToSendRequest();
     void SendRequest();
 
 private:
