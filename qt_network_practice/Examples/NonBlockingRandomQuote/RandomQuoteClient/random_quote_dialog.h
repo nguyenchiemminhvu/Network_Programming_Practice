@@ -3,7 +3,9 @@
 
 #include <QDialog>
 #include <QString>
+#include <QTimer>
 #include <QThread>
+#include <QAbstractSocket>
 #include <QTcpSocket>
 #include <QDataStream>
 #include <QLabel>
@@ -11,6 +13,7 @@
 #include <QPushButton>
 #include <QPlainTextEdit>
 #include <QGridLayout>
+#include <QMessageBox>
 #include <QDebug>
 
 QT_BEGIN_NAMESPACE
@@ -26,20 +29,26 @@ public:
     ~Random_Quote_Dialog();
 
 signals:
+    void UpdateUI();
 
 public slots:
     void ReadyToSendRequest();
     void SendRequest();
+    void OnQuoteAvailable();
+    void OnErrorHappenned(QAbstractSocket::SocketError err);
 
 private:
     void InitUI();
+    void InitSocket();
     void EstablishSignalsAndSlots();
 
 private:
     Ui::Random_Quote_Dialog *ui;
 
 private:
+    QString m_quote_to_display;
     QTcpSocket *m_soc_client;
+    QDataStream m_stream_client;
 
     QLabel *m_lHost;
     QLabel *m_lPort;
