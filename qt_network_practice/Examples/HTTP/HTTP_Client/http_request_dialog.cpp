@@ -84,6 +84,13 @@ void HTTP_Request_Dialog::EstablishSignalsAndSlots()
 
 std::unique_ptr<QFile> HTTP_Request_Dialog::OpenFileToWrite(const QString &file_name)
 {
+    std::unique_ptr<QFile> file(new QFile(file_name));
+    if (!file->open(QIODevice::OpenModeFlag::WriteOnly))
+    {
+        QMessageBox::information(this, tr("ERROR"), tr("Unable to open file %1: %2").arg(QDir::toNativeSeparators(file_name).arg(file->errorString())));
+        return nullptr;
+    }
 
+    return file;
 }
 

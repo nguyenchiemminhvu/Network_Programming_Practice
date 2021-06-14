@@ -9,15 +9,17 @@
 #include <QNetworkReply>
 #include <QSslError>
 #include <QAuthenticator>
-#include <QFile>
 #include <QDir>
-#include <QStandardPaths>
+#include <QFile>
 #include <QFileInfo>
+#include <QIODevice>
+#include <QStandardPaths>
 
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QCheckBox>
+#include <QMessageBox>
 
 #include <QString>
 #include <QList>
