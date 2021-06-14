@@ -6,6 +6,8 @@ HTTP_Request_Dialog::HTTP_Request_Dialog(QWidget *parent)
     , ui(new Ui::HTTP_Request_Dialog)
 {
     ui->setupUi(this);
+
+
 }
 
 HTTP_Request_Dialog::~HTTP_Request_Dialog()
