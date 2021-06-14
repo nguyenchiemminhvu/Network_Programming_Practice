@@ -72,7 +72,22 @@ void HTTP_Request_Dialog::StartDownload()
         file_name.prepend(download_dir + '/');
     }
 
+    if (QFile::exists(file_name))
+    {
+        int rc = QMessageBox::information(this, tr("File exists"), tr("Overwrite?"), QMessageBox::Yes | QMessageBox::No);
+        if (rc == QMessageBox::Yes)
+        {
+            QFile::remove(file_name);
+        }
+    }
 
+    m_file = this->OpenFileToWrite(file_name);
+    if (!m_file)
+    {
+        return;
+    }
+
+    SendRequest(url_valid);
 }
 
 void HTTP_Request_Dialog::OnDownloadCanceled()
@@ -113,7 +128,20 @@ void HTTP_Request_Dialog::OnAuthenticationRequired(QNetworkReply *rep, QAuthenti
 #ifndef QT_NO_SSL
 void HTTP_Request_Dialog::OnSslError(QNetworkReply *rep, QList<QSslError> errors)
 {
-    rep->ignoreSslErrors();
+    QString errorString;
+    for (const QSslError &error : errors)
+    {
+        if (!errorString.isEmpty())
+            errorString += '\n';
+        errorString += error.errorString();
+    }
+
+    if (QMessageBox::warning(this, tr("SSL Errors"),
+                             tr("One or more SSL errors has occurred:\n%1").arg(errorString),
+                             QMessageBox::Ignore | QMessageBox::Abort) == QMessageBox::Ignore)
+    {
+        rep->ignoreSslErrors();
+    }
 }
 #endif
 
