@@ -2,6 +2,7 @@
 #define DOWNLOADPROGRESSDIALOG_H
 
 #include <QObject>
+#include <QWidget>
 #include <QProgressBar>
 
 class DownloadProgressDialog : public QProgressBar
@@ -9,7 +10,7 @@ class DownloadProgressDialog : public QProgressBar
     Q_OBJECT
 
 public:
-    explicit DownloadProgressDialog(QObject *parent = nullptr);
+    explicit DownloadProgressDialog(QWidget *parent = nullptr);
 
 signals:
 

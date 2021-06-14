@@ -1,6 +1,7 @@
 #include "downloadprogressdialog.h"
 
-DownloadProgressDialog::DownloadProgressDialog(QObject *parent) : QObject(parent)
+DownloadProgressDialog::DownloadProgressDialog(QWidget *parent)
+    : QProgressBar(parent)
 {
 
 }
