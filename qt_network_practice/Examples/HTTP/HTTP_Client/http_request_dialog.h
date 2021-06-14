@@ -10,11 +10,17 @@
 #include <QSslError>
 #include <QAuthenticator>
 #include <QFile>
+#include <QDir>
+#include <QStandardPaths>
+#include <QFileInfo>
 
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QCheckBox>
+
+#include <QString>
+#include <QList>
 
 #include <memory>
 
@@ -30,14 +36,27 @@ public:
     HTTP_Request_Dialog(QWidget *parent = nullptr);
     ~HTTP_Request_Dialog();
 
+    void SendRequest(const QUrl &url);
+
 signals:
 
 private slots:
+    void UpdateUI();
 
+    void StartDownload();
+    void CancelDownload();
+    void OnDownloadFinished();
+    void OnReadyRead();
+
+    void OnAuthenticationRequired(QNetworkReply *rep, QAuthenticator *auth);
+#ifndef QT_NO_SSL
+    void OnSslError(QNetworkReply *rep, QList<QSslError> errors);
+#endif
 
 private:
     void InitUI();
     void EstablishSignalsAndSlots();
+    std::unique_ptr<QFile> OpenFileToWrite(const QString &file_name);
 
 private:
     Ui::HTTP_Request_Dialog *ui;

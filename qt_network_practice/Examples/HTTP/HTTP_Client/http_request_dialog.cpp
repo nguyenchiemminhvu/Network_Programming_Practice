@@ -8,6 +8,10 @@ HTTP_Request_Dialog::HTTP_Request_Dialog(QWidget *parent)
 {
     ui->setupUi(this);
 
+    m_reply = NULL;
+    m_file = NULL;
+    m_bRequestAborted = false;
+
     InitUI();
     EstablishSignalsAndSlots();
 }
@@ -17,12 +21,68 @@ HTTP_Request_Dialog::~HTTP_Request_Dialog()
     delete ui;
 }
 
-void HTTP_Request_Dialog::InitUI()
+void HTTP_Request_Dialog::SendRequest(const QUrl &url)
 {
 
 }
 
+void HTTP_Request_Dialog::UpdateUI()
+{
+
+}
+
+void HTTP_Request_Dialog::StartDownload()
+{
+
+}
+
+void HTTP_Request_Dialog::CancelDownload()
+{
+
+}
+
+void HTTP_Request_Dialog::OnDownloadFinished()
+{
+
+}
+
+void HTTP_Request_Dialog::OnReadyRead()
+{
+
+}
+
+void HTTP_Request_Dialog::OnAuthenticationRequired(QNetworkReply *rep, QAuthenticator *auth)
+{
+
+}
+
+#ifndef QT_NO_SSL
+void HTTP_Request_Dialog::OnSslError(QNetworkReply *rep, QList<QSslError> errors)
+{
+
+}
+#endif
+
+void HTTP_Request_Dialog::InitUI()
+{
+    QString download_dir = QStandardPaths::writableLocation(QStandardPaths::DesktopLocation);
+    if (download_dir.isEmpty() || !QFileInfo(download_dir).isDir())
+        download_dir = QDir::currentPath();
+    ui->le_directory->setText(QDir::toNativeSeparators(download_dir));
+}
+
 void HTTP_Request_Dialog::EstablishSignalsAndSlots()
+{
+    connect(ui->pb_quit, &QPushButton::clicked, this, &HTTP_Request_Dialog::close);
+    connect(ui->pb_download, &QPushButton::clicked, this, &HTTP_Request_Dialog::StartDownload);
+
+    connect(&m_access_manager, &QNetworkAccessManager::authenticationRequired, this, &HTTP_Request_Dialog::OnAuthenticationRequired);
+#ifndef QT_NO_SSL
+    connect(&m_access_manager, &QNetworkAccessManager::sslErrors, this, &HTTP_Request_Dialog::OnSslError);
+#endif
+}
+
+std::unique_ptr<QFile> HTTP_Request_Dialog::OpenFileToWrite(const QString &file_name)
 {
 
 }
