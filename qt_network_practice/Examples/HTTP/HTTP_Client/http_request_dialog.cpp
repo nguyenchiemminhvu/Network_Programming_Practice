@@ -67,13 +67,23 @@ void HTTP_Request_Dialog::OnReadyRead()
 
 void HTTP_Request_Dialog::OnAuthenticationRequired(QNetworkReply *rep, QAuthenticator *auth)
 {
+    QDialog authen_dialog;
+    Ui::Authentication_Dialog ui;
+    ui.setupUi(&authen_dialog);
 
+    ui.l_description->setText(tr("%1 at %2").arg(auth->realm()).arg(m_url.host()));
+
+    if (authen_dialog.exec() == QDialog::Accepted)
+    {
+        auth->setUser(ui.le_username->text());
+        auth->setPassword(ui.le_password->text());
+    }
 }
 
 #ifndef QT_NO_SSL
 void HTTP_Request_Dialog::OnSslError(QNetworkReply *rep, QList<QSslError> errors)
 {
-
+    rep->ignoreSslErrors();
 }
 #endif
 
@@ -110,4 +120,3 @@ std::unique_ptr<QFile> HTTP_Request_Dialog::OpenFileToWrite(const QString &file_
 
     return file;
 }
-

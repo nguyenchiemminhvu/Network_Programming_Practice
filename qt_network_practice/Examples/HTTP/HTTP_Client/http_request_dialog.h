@@ -35,8 +35,8 @@ class HTTP_Request_Dialog : public QDialog
     Q_OBJECT
 
 public:
-    HTTP_Request_Dialog(QWidget *parent = nullptr);
-    ~HTTP_Request_Dialog();
+    explicit HTTP_Request_Dialog(QWidget *parent = nullptr);
+    virtual ~HTTP_Request_Dialog();
 
     void SendRequest(const QUrl &url);
 
