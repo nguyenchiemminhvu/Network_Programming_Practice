@@ -1,7 +1,19 @@
 #ifndef HTTP_REQUEST_DIALOG_H
 #define HTTP_REQUEST_DIALOG_H
 
+#include "downloadprogressdialog.h"
+
 #include <QDialog>
+#include <QUrl>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QSslError>
+#include <QAuthenticator>
+
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QCheckBox>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class HTTP_Request_Dialog; }
