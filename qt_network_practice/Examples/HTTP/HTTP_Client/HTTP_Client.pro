@@ -23,6 +23,7 @@ HEADERS += \
     http_request_dialog.h
 
 FORMS += \
+    authentication_dialog.ui \
     http_request_dialog.ui
 
 # Default rules for deployment.
