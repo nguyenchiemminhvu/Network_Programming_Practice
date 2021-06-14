@@ -52,7 +52,9 @@ void HTTP_Request_Dialog::StartDownload()
 
 void HTTP_Request_Dialog::OnDownloadCanceled()
 {
-
+    m_bRequestAborted = true;
+    m_reply->abort();
+    UpdateUI();
 }
 
 void HTTP_Request_Dialog::OnDownloadFinished()
@@ -62,7 +64,10 @@ void HTTP_Request_Dialog::OnDownloadFinished()
 
 void HTTP_Request_Dialog::OnReadyRead()
 {
-
+    if (m_file)
+    {
+        m_file->write(m_reply->readAll());
+    }
 }
 
 void HTTP_Request_Dialog::OnAuthenticationRequired(QNetworkReply *rep, QAuthenticator *auth)
