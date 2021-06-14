@@ -28,7 +28,7 @@ void HTTP_Request_Dialog::SendRequest(const QUrl &url)
 
 void HTTP_Request_Dialog::UpdateUI()
 {
-
+    ui->pb_download->setEnabled(!ui->le_url->text().isEmpty());
 }
 
 void HTTP_Request_Dialog::StartDownload()
@@ -69,10 +69,13 @@ void HTTP_Request_Dialog::InitUI()
     if (download_dir.isEmpty() || !QFileInfo(download_dir).isDir())
         download_dir = QDir::currentPath();
     ui->le_directory->setText(QDir::toNativeSeparators(download_dir));
+
+    ui->pb_download->setEnabled(false);
 }
 
 void HTTP_Request_Dialog::EstablishSignalsAndSlots()
 {
+    connect(ui->le_url, &QLineEdit::textChanged, this, &HTTP_Request_Dialog::UpdateUI);
     connect(ui->pb_quit, &QPushButton::clicked, this, &HTTP_Request_Dialog::close);
     connect(ui->pb_download, &QPushButton::clicked, this, &HTTP_Request_Dialog::StartDownload);
 
