@@ -87,6 +87,7 @@ void HTTP_Request_Dialog::StartDownload()
         return;
     }
 
+    ui->pb_download->setEnabled(false);
     SendRequest(url_valid);
 }
 
@@ -99,7 +100,61 @@ void HTTP_Request_Dialog::OnDownloadCanceled()
 
 void HTTP_Request_Dialog::OnDownloadFinished()
 {
+    QFileInfo file_info;
+    if (m_file)
+    {
+        file_info.setFile(m_file->fileName());
+        m_file->close();
+        m_file.reset();
+    }
 
+    if (m_bRequestAborted)
+    {
+        UpdateUI();
+        m_reply = nullptr;
+        return;
+    }
+
+    if (m_reply->error())
+    {
+        QFile::remove(file_info.absolutePath());
+        UpdateUI();
+        m_reply = nullptr;
+        return;
+    }
+
+    const QVariant redirection_attr = m_reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
+    m_reply = nullptr;
+
+    if (!redirection_attr.isNull())
+    {
+        const QUrl redirection_url = m_url.resolved(redirection_attr.toUrl());
+        int rc = QMessageBox::information(this, tr("Redirect"), tr("Redirect to %1").arg(redirection_url.toString()));
+        if (rc == QMessageBox::No)
+        {
+            QFile::remove(file_info.absolutePath());
+            UpdateUI();
+            return;
+        }
+        else
+        {
+            m_file = this->OpenFileToWrite(file_info.absolutePath());
+            if (!m_file)
+            {
+                UpdateUI();
+                return;
+            }
+            SendRequest(redirection_url);
+            return;
+        }
+    }
+
+    UpdateUI();
+
+    if (ui->cb_launch_file->isChecked())
+    {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(file_info.absoluteFilePath()));
+    }
 }
 
 void HTTP_Request_Dialog::OnReadyRead()

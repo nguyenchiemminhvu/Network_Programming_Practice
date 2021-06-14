@@ -33,3 +33,16 @@ FORMS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+win32: LIBS += -L$$PWD/./ -lcrypto
+
+INCLUDEPATH += $$PWD/.
+DEPENDPATH += $$PWD/.
+
+win32:!win32-g++: PRE_TARGETDEPS += $$PWD/./crypto.lib
+else:win32-g++: PRE_TARGETDEPS += $$PWD/./libcrypto.a
+
+win32: LIBS += -L$$PWD/./ -lssl
+
+INCLUDEPATH += $$PWD/.
+DEPENDPATH += $$PWD/.

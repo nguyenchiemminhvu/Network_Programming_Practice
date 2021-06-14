@@ -14,6 +14,7 @@
 #include <QFileInfo>
 #include <QIODevice>
 #include <QStandardPaths>
+#include <QDesktopServices>
 
 #include <QLabel>
 #include <QLineEdit>
@@ -23,6 +24,7 @@
 
 #include <QString>
 #include <QList>
+#include <QVariant>
 
 #include <memory>
 
