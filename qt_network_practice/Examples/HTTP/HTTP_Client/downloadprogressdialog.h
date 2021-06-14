@@ -3,19 +3,20 @@
 
 #include <QObject>
 #include <QWidget>
-#include <QProgressBar>
+#include <QUrl>
+#include <QProgressDialog>
 
-class DownloadProgressDialog : public QProgressBar
+class DownloadProgressDialog : public QProgressDialog
 {
     Q_OBJECT
 
 public:
-    explicit DownloadProgressDialog(QWidget *parent = nullptr);
+    explicit DownloadProgressDialog(const QUrl &url, QWidget *parent = nullptr);
 
 signals:
 
 public slots:
-    void OnNetworkReply(qint64 bytes_read, qint64 bytes_total);
+    void OnDownloadProgress(qint64 bytes_read, qint64 bytes_total);
 };
 
 #endif // DOWNLOADPROGRESSDIALOG_H

@@ -46,7 +46,7 @@ private slots:
     void UpdateUI();
 
     void StartDownload();
-    void CancelDownload();
+    void OnDownloadCanceled();
     void OnDownloadFinished();
     void OnReadyRead();
 

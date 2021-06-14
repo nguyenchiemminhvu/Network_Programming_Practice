@@ -23,7 +23,21 @@ HTTP_Request_Dialog::~HTTP_Request_Dialog()
 
 void HTTP_Request_Dialog::SendRequest(const QUrl &url)
 {
+    m_url = url;
+    m_bRequestAborted = false;
 
+    m_reply = m_access_manager.get(QNetworkRequest(url));
+    connect(m_reply, &QNetworkReply::finished, this, &HTTP_Request_Dialog::OnDownloadFinished);
+    connect(m_reply, &QNetworkReply::readyRead, this, &HTTP_Request_Dialog::OnReadyRead);
+
+    DownloadProgressDialog *download_dialog = new DownloadProgressDialog(url, this);
+    connect(download_dialog, &DownloadProgressDialog::canceled, this, &HTTP_Request_Dialog::OnDownloadCanceled);
+    connect(m_reply, &QNetworkReply::downloadProgress, download_dialog, &DownloadProgressDialog::OnDownloadProgress);
+    connect(m_reply, &QNetworkReply::finished, download_dialog, &DownloadProgressDialog::hide);
+    connect(m_reply, &QNetworkReply::finished, download_dialog, &DownloadProgressDialog::deleteLater);
+    connect(m_reply, &QNetworkReply::finished, m_reply, &QNetworkReply::deleteLater);
+
+    download_dialog->show();
 }
 
 void HTTP_Request_Dialog::UpdateUI()
@@ -36,7 +50,7 @@ void HTTP_Request_Dialog::StartDownload()
 
 }
 
-void HTTP_Request_Dialog::CancelDownload()
+void HTTP_Request_Dialog::OnDownloadCanceled()
 {
 
 }
