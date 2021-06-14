@@ -7,6 +7,7 @@
 #include <QUrl>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QSslConfiguration>
 #include <QSslError>
 #include <QAuthenticator>
 #include <QDir>

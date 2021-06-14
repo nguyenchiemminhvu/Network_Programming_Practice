@@ -26,7 +26,11 @@ void HTTP_Request_Dialog::SendRequest(const QUrl &url)
     m_url = url;
     m_bRequestAborted = false;
 
-    m_reply = m_access_manager.get(QNetworkRequest(url));
+    QNetworkRequest request(url);
+    QSslConfiguration ssl_default_config(QSslConfiguration::defaultConfiguration());
+    ssl_default_config.setProtocol(QSsl::SslProtocol::SslV3);
+    request.setSslConfiguration(ssl_default_config);
+    m_reply = m_access_manager.get(QNetworkRequest(request));
     connect(m_reply, &QNetworkReply::finished, this, &HTTP_Request_Dialog::OnDownloadFinished);
     connect(m_reply, &QNetworkReply::readyRead, this, &HTTP_Request_Dialog::OnReadyRead);
 
