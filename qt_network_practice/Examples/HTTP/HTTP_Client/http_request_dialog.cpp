@@ -47,6 +47,31 @@ void HTTP_Request_Dialog::UpdateUI()
 
 void HTTP_Request_Dialog::StartDownload()
 {
+    QString url_spec = ui->le_url->text().trimmed();
+    if (url_spec.isEmpty())
+    {
+        return;
+    }
+
+    QUrl url_valid = QUrl::fromUserInput(url_spec);
+    if (!url_valid.isValid())
+    {
+        QMessageBox::information(this, tr("ERROR"), tr("Invalid URL: %1").arg(url_spec));
+        return;
+    }
+
+    QString file_name = url_valid.fileName();
+    if (file_name.isEmpty())
+        file_name = ui->le_default_file->text().trimmed();
+    if (file_name.isEmpty())
+        file_name = "HTTP_Client_downloaded.dat";
+
+    QString download_dir = QDir::cleanPath(ui->le_directory->text().trimmed());
+    if (!download_dir.isEmpty() && QFileInfo(download_dir).isDir())
+    {
+        file_name.prepend(download_dir + '/');
+    }
+
 
 }
 
