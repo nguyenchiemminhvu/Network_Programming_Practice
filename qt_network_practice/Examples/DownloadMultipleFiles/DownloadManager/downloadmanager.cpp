@@ -60,7 +60,7 @@ bool DownloadManager::IsHttpRedirect()
 {
     if (m_current_reply)
     {
-        int status = m_current_reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
+        int status = m_current_reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toInt();
         return status == 301 || status == 302 || status == 303 || status == 305 || status == 307 || status == 308;
     }
     return false;
