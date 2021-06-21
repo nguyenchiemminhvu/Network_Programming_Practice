@@ -28,7 +28,7 @@ void HTTP_Request_Dialog::SendRequest(const QUrl &url)
 
     QNetworkRequest request(url);
     QSslConfiguration ssl_default_config(QSslConfiguration::defaultConfiguration());
-    ssl_default_config.setProtocol(QSsl::SslProtocol::SslV3);
+    ssl_default_config.setProtocol(QSsl::SslProtocol::SslV2);
     request.setSslConfiguration(ssl_default_config);
     m_reply = m_access_manager.get(QNetworkRequest(request));
     connect(m_reply, &QNetworkReply::finished, this, &HTTP_Request_Dialog::OnDownloadFinished);
