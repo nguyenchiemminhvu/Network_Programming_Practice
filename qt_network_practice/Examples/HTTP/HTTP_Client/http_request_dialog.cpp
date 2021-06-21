@@ -114,6 +114,7 @@ void HTTP_Request_Dialog::OnDownloadFinished()
 
     if (m_bRequestAborted)
     {
+        QMessageBox::information(this, "Error", "Aborted");
         UpdateUI();
         m_reply = nullptr;
         return;
@@ -121,6 +122,7 @@ void HTTP_Request_Dialog::OnDownloadFinished()
 
     if (m_reply->error())
     {
+        QMessageBox::information(this, "Error", m_reply->errorString());
         QFile::remove(file_info.absolutePath());
         UpdateUI();
         m_reply = nullptr;
@@ -136,6 +138,7 @@ void HTTP_Request_Dialog::OnDownloadFinished()
         int rc = QMessageBox::information(this, tr("Redirect"), tr("Redirect to %1").arg(redirection_url.toString()));
         if (rc == QMessageBox::No)
         {
+            QMessageBox::information(this, "Error", "Not Redirected");
             QFile::remove(file_info.absolutePath());
             UpdateUI();
             return;
