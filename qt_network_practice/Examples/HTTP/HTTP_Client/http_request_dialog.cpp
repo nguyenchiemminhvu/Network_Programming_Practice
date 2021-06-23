@@ -27,8 +27,8 @@ void HTTP_Request_Dialog::SendRequest(const QUrl &url)
     m_bRequestAborted = false;
 
     QNetworkRequest request(url);
-    QSslConfiguration ssl_default_config(QSslConfiguration::defaultConfiguration());
-    ssl_default_config.setProtocol(QSsl::SslProtocol::SslV2);
+    QSslConfiguration ssl_default_config(request.sslConfiguration());
+    ssl_default_config.setPeerVerifyMode(QSslSocket::VerifyNone);
     request.setSslConfiguration(ssl_default_config);
     m_reply = m_access_manager.get(QNetworkRequest(request));
     connect(m_reply, &QNetworkReply::finished, this, &HTTP_Request_Dialog::OnDownloadFinished);
@@ -57,7 +57,7 @@ void HTTP_Request_Dialog::StartDownload()
         return;
     }
 
-    QUrl url_valid = QUrl::fromUserInput(url_spec);
+    QUrl url_valid = QUrl::fromEncoded(url_spec.toLocal8Bit());
     if (!url_valid.isValid())
     {
         QMessageBox::information(this, tr("ERROR"), tr("Invalid URL: %1").arg(url_spec));
