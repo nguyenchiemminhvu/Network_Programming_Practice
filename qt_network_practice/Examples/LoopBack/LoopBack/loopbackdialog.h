@@ -8,11 +8,13 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QProgressBar>
+#include <QMessageBox>
 #include <QGridLayout>
 
-QT_BEGIN_NAMESPACE
-namespace Ui { class LoopBackDialog; }
-QT_END_NAMESPACE
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QAbstractSocket>
+#include <QByteArray>
 
 class LoopBackDialog : public QDialog
 {
@@ -22,7 +24,30 @@ public:
     LoopBackDialog(QWidget *parent = nullptr);
     ~LoopBackDialog();
 
+signals:
+
+public slots:
+    void StartLoopback();
+    void OnNewConnection();
+    void OnClientConnected();
+    void OnClientProgress(qint64 bytes_written);
+    void OnReadyRead();
+    void Reset();
+
 private:
-    Ui::LoopBackDialog *ui;
+    void InitUI();
+    void EstablishSignalsAndSlots();
+
+private:
+    QTcpServer m_server;
+    QTcpSocket m_client;
+    QTcpSocket * m_connection = nullptr;
+
+    QProgressBar * m_prClient;
+    QProgressBar * m_prServer;
+    QLabel * m_lClientStatus;
+    QLabel * m_lServerStatus;
+    QPushButton * m_pbStart;
+    QPushButton * m_pbQuit;
 };
 #endif // LOOPBACKDIALOG_H
