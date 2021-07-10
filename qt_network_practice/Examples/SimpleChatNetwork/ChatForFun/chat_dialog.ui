@@ -6,13 +6,56 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
-    <height>600</height>
+    <width>463</width>
+    <height>271</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Chat_Dialog</string>
+   <string>Chat For Fun</string>
   </property>
+  <widget class="QTextEdit" name="m_teChatBox">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>10</y>
+     <width>341</width>
+     <height>201</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QListWidget" name="m_lwUsers">
+   <property name="geometry">
+    <rect>
+     <x>360</x>
+     <y>10</y>
+     <width>91</width>
+     <height>201</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="m_lMessage">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>230</y>
+     <width>67</width>
+     <height>17</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Message:</string>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="m_leMessage">
+   <property name="geometry">
+    <rect>
+     <x>100</x>
+     <y>230</y>
+     <width>351</width>
+     <height>25</height>
+    </rect>
+   </property>
+  </widget>
  </widget>
  <resources/>
  <connections/>
